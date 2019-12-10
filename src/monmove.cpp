@@ -987,7 +987,7 @@ void monster::nursebot_operate( player *dragged_foe )
             add_effect( effect_countdown, 2_turns );// there's still time to get away
             add_msg( m_bad, _( "The %s produces a syringe full of some translucent liquid." ), name() );
         } else if( g->critter_at( goal ) != nullptr && has_effect( effect_dragging ) ) {
-            sounds::sound( pos(), 8, sounds::sound_t::speech,
+            sounds::sound( pos(), 8, sounds::sound_t::electronic_speech,
                            string_format(
                                _( "a soft robotic voice say, \"Please step away from the autodoc, this patient needs immediate care.\"" ) ) );
             // TODO: Make it able to push NPC/player
@@ -1230,7 +1230,8 @@ static std::vector<tripoint> get_bashing_zone( const tripoint &bashee, const tri
 bool monster::bash_at( const tripoint &p )
 {
     if( p.z != posz() ) {
-        return false; // TODO: Remove this
+        // TODO: Remove this
+        return false;
     }
 
     //Hallucinations can't bash stuff.
@@ -1333,7 +1334,8 @@ bool monster::attack_at( const tripoint &p )
         return false;
     }
     if( p.z != posz() ) {
-        return false; // TODO: Remove this
+        // TODO: Remove this
+        return false;
     }
 
     if( p == g->u.pos() ) {
