@@ -976,9 +976,9 @@ static void sleep()
 
         as_m.reset();
         as_m.text = can_hibernate ?
-                    _( "You're engorged to hibernate. The alarm would only attract attention. Set an alarm anyway?" +
+                    _( "You're engorged to hibernate.  The alarm would only attract attention.  Set an alarm anyway?" +
                        deaf_text ) :
-                    _( "You have an alarm clock. Set an alarm?" + deaf_text );
+                    _( "You have an alarm clock.  Set an alarm?" + deaf_text );
 
         as_m.entries.emplace_back( 0, true,
                                    get_option<bool>( "FORCE_CAPITAL_YN" ) ? 'N' : 'n',
@@ -1922,7 +1922,7 @@ bool game::handle_action()
                 break;
 
             case ACTION_UNLOAD:
-                unload();
+                avatar_action::unload( u );
                 break;
 
             case ACTION_MEND:

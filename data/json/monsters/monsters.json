@@ -765,7 +765,7 @@
     "vision_day": 50,
     "vision_night": 35,
     "revert_to_itype": "bot_chickenbot",
-    "starting_ammo": { "40mm_frag": 100, "556": 1000 },
+    "starting_ammo": { "40x46mm_m433": 100, "556": 1000 },
     "path_settings": { "max_dist": 10 },
     "special_attacks": [ [ "CHICKENBOT", 4 ] ],
     "death_drops": { "groups": [ [ "robots", 4 ], [ "chickenbot", 4, 6 ] ] },
@@ -1704,7 +1704,7 @@
     "armor_cut": 8,
     "harvest": "meatslug",
     "death_function": [ "WORM" ],
-    "flags": [ "DIGS", "HEARS", "POISON", "GOODHEARING", "BASHES", "DESTROYS", "WARM" ]
+    "flags": [ "DIGS", "HEARS", "POISON", "GOODHEARING", "BASHES", "DESTROYS" ]
   },
   {
     "id": "mon_gracke",
@@ -1756,7 +1756,7 @@
     "armor_bash": 2,
     "harvest": "mutant_meatslug",
     "death_function": [ "NORMAL" ],
-    "flags": [ "DIGS", "HEARS", "GOODHEARING", "WARM" ]
+    "flags": [ "DIGS", "HEARS", "GOODHEARING" ]
   },
   {
     "id": "mon_hallu_mom",
@@ -2822,7 +2822,7 @@
     "armor_cut": 90,
     "vision_day": 50,
     "revert_to_itype": "bot_tankbot",
-    "starting_ammo": { "40mm_frag": 200, "556": 3000 },
+    "starting_ammo": { "40x46mm_m433": 200, "556": 3000 },
     "path_settings": { "max_dist": 20 },
     "special_attacks": [ [ "MULTI_ROBOT", 3 ] ],
     "death_drops": { "groups": [ [ "robots", 4 ] ] },
@@ -2986,7 +2986,7 @@
     "armor_bash": 2,
     "harvest": "mutant_meatslug",
     "death_function": [ "WORM" ],
-    "flags": [ "DIGS", "HEARS", "GOODHEARING", "WARM" ]
+    "flags": [ "DIGS", "HEARS", "GOODHEARING" ]
   },
   {
     "id": "mon_yugg",

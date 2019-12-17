@@ -2098,7 +2098,7 @@ int game::inventory_item_menu( int pos, int iStartX, int iWidth,
                     u.drop( pos, u.pos() );
                     break;
                 case 'U':
-                    unload( pos );
+                    unload( oThisItem );
                     break;
                 case 'r':
                     reload( locThisItem );
@@ -8517,39 +8517,6 @@ void game::reload_weapon( bool try_everything )
     reload_item();
 }
 
-// Unload a container, gun, or tool
-// If it's a gun, some gunmods can also be loaded
-void game::unload( int pos )
-{
-    item *it = nullptr;
-    item_location item_loc;
-
-    if( pos == INT_MIN ) {
-        item_loc = inv_map_splice( [&]( const item & it ) {
-            return u.rate_action_unload( it ) == HINT_GOOD;
-        }, _( "Unload item" ), 1, _( "You have nothing to unload." ) );
-        it = item_loc.get_item();
-
-        if( it == nullptr ) {
-            add_msg( _( "Never mind." ) );
-            return;
-        }
-    } else {
-        it = &u.i_at( pos );
-        if( it->is_null() ) {
-            debugmsg( "Tried to unload non-existent item" );
-            return;
-        }
-        item_loc = item_location( u, it );
-    }
-
-    if( u.unload( *it ) ) {
-        if( it->has_flag( "MAG_DESTROY" ) && it->ammo_remaining() == 0 ) {
-            item_loc.remove_item();
-        }
-    }
-}
-
 void game::mend( int pos )
 {
     if( pos == INT_MIN ) {
@@ -10268,6 +10235,11 @@ void game::vertical_move( int movez, bool force )
     } else {
         u.moves -= move_cost;
     }
+    for( const auto &np : npcs_to_bring ) {
+        if( np->in_vehicle ) {
+            g->m.unboard_vehicle( np->pos() );
+        }
+    }
     const tripoint old_pos = g->u.pos();
     point submap_shift;
     vertical_shift( z_after );
@@ -10298,7 +10270,6 @@ void game::vertical_move( int movez, bool force )
             [this, np]( const tripoint & c ) {
                 return !np->is_dangerous_fields( m.field_at( c ) ) && m.tr_at( c ).is_benign();
             } );
-
             if( found != candidates.end() ) {
                 // TODO: De-uglify
                 np->setpos( *found );
