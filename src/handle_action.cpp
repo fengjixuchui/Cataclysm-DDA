@@ -1926,12 +1926,14 @@ bool game::handle_action()
                 break;
 
             case ACTION_MEND:
-                mend();
+                avatar_action::mend( g->u, item_location() );
                 break;
 
-            case ACTION_THROW:
-                avatar_action::plthrow( g->u );
+            case ACTION_THROW: {
+                item_location loc;
+                avatar_action::plthrow( g->u, loc );
                 break;
+            }
 
             case ACTION_FIRE:
                 fire();
