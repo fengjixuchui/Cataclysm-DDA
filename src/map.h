@@ -268,10 +268,7 @@ class map
         bool check_seen_cache( const tripoint &p ) const {
             std::bitset<MAPSIZE_X *MAPSIZE_Y> &memory_seen_cache =
                 get_cache( p.z ).map_memory_seen_cache;
-            if( !memory_seen_cache[ static_cast<size_t>( p.x + p.y * MAPSIZE_Y ) ] ) {
-                return true;
-            }
-            return false;
+            return !memory_seen_cache[ static_cast<size_t>( p.x + p.y * MAPSIZE_Y ) ];
         }
         bool check_and_set_seen_cache( const tripoint &p ) const {
             std::bitset<MAPSIZE_X *MAPSIZE_Y> &memory_seen_cache =
@@ -1542,7 +1539,6 @@ class map
         void draw_temple( mapgendata &dat );
         void draw_mine( mapgendata &dat );
         void draw_spiral( mapgendata &dat );
-        void draw_sarcophagus( mapgendata &dat );
         void draw_fema( mapgendata &dat );
         void draw_anthill( mapgendata &dat );
         void draw_slimepit( mapgendata &dat );
