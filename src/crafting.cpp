@@ -498,7 +498,8 @@ const inventory &Character::crafting_inventory( bool clear_path )
     return crafting_inventory( tripoint_zero, PICKUP_RANGE, clear_path );
 }
 
-const inventory &Character::crafting_inventory( const tripoint &src_pos, int radius, bool clear_path )
+const inventory &Character::crafting_inventory( const tripoint &src_pos, int radius,
+        bool clear_path )
 {
     tripoint inv_pos = src_pos;
     if( src_pos == tripoint_zero ) {
@@ -887,8 +888,8 @@ double player::crafting_success_roll( const recipe &making ) const
 
     // It's tough to craft with paws.  Fortunately it's just a matter of grip and fine-motor,
     // not inability to see what you're doing
-    for( const std::pair< trait_id, trait_data > &mut : my_mutations ) {
-        for( const std::pair<skill_id, int> &skib : mut.first->craft_skill_bonus ) {
+    for( const std::pair<const trait_id, trait_data> &mut : my_mutations ) {
+        for( const std::pair<const skill_id, int> &skib : mut.first->craft_skill_bonus ) {
             if( making.skill_used == skib.first ) {
                 skill_dice += skib.second;
             }

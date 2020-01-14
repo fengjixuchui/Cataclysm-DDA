@@ -4893,7 +4893,7 @@ void game::save_cyborg( item *cyborg, const tripoint &couch_pos, player &install
     }
 
     int chance_of_success = bionic_manip_cos( adjusted_skill + assist_bonus, true, difficulty );
-    int success = chance_of_success - rng( 1, 100 ) ;
+    int success = chance_of_success - rng( 1, 100 );
 
     if( !g->u.query_yn(
             _( "WARNING: %i percent chance of SEVERE damage to all body parts!  Continue anyway?" ),
@@ -7789,14 +7789,7 @@ void game::drop_in_direction()
 // Used to set up the first Hotkey in the display set
 static int get_initial_hotkey( const size_t menu_index )
 {
-    int hotkey = -1;
-    if( menu_index == 0 ) {
-        const int butcher_key = inp_mngr.get_previously_pressed_key();
-        if( butcher_key != 0 ) {
-            hotkey = butcher_key;
-        }
-    }
-    return hotkey;
+    return ( menu_index == 0 ) ? hotkey_for_action( ACTION_BUTCHER ) : -1;
 }
 
 // Returns a vector of pairs.

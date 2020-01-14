@@ -1847,7 +1847,7 @@ static std::vector<std::tuple<tripoint, itype_id, int>> requirements_map( player
             }
         }
     }
-    for( const std::tuple<tripoint, itype_id, int> elem : final_map ) {
+    for( const std::tuple<tripoint, itype_id, int> &elem : final_map ) {
         add_msg( m_debug, "%s is fetching %s from x: %d y: %d ", p.disp_name(), std::get<1>( elem ),
                  std::get<0>( elem ).x, std::get<0>( elem ).y );
     }
@@ -2350,7 +2350,9 @@ static bool chop_tree_activity( player &p, const tripoint &src_loc )
         return false;
     }
     int moves = chop_moves( p, best_qual );
-    p.consume_charges( *best_qual, best_qual->type->charges_to_use() );
+    if( best_qual->type->can_have_charges() ) {
+        p.consume_charges( *best_qual, best_qual->type->charges_to_use() );
+    }
     const ter_id ter = g->m.ter( src_loc );
     if( g->m.has_flag( "TREE", src_loc ) ) {
         p.assign_activity( activity_id( "ACT_CHOP_TREE" ), moves, -1, p.get_item_position( best_qual ) );
