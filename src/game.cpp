@@ -1583,7 +1583,6 @@ bool game::do_turn()
     u.update_bodytemp();
     u.update_body_wetness( *weather.weather_precise );
     u.apply_wetness_morale( weather.temperature );
-    u.do_skill_rust();
 
     if( calendar::once_every( 1_minutes ) ) {
         u.update_morale();
@@ -1687,13 +1686,9 @@ bool game::cancel_activity_or_ignore_query( const distraction_type type, const s
     if( !u.activity || u.activity.is_distraction_ignored( type ) ) {
         return false;
     }
-    bool force_uc = get_option<bool>( "FORCE_CAPITAL_YN" );
-
-    const auto allow_key = [force_uc]( const input_event & evt ) {
-        return !force_uc || evt.type != CATA_INPUT_KEYBOARD ||
-               // std::lower is undefined outside unsigned char range
-               evt.get_first_input() < 'a' || evt.get_first_input() > 'z';
-    };
+    const bool force_uc = get_option<bool>( "FORCE_CAPITAL_YN" );
+    const auto &allow_key = force_uc ? input_context::disallow_lower_case
+                            : input_context::allow_all_keys;
 
     const auto &action = query_popup()
                          .context( "CANCEL_ACTIVITY_OR_IGNORE_QUERY" )
@@ -8176,7 +8171,7 @@ void game::butcher()
 
             kmenu.addentry_col( MULTIDISASSEMBLE_ONE, true, 'D', _( "Disassemble everything once" ),
                                 to_string_clipped( time_duration::from_turns( time_to_disassemble / 100 ) ) );
-            kmenu.addentry_col( MULTIDISASSEMBLE_ALL, true, 'd', _( "Disassemble everything" ),
+            kmenu.addentry_col( MULTIDISASSEMBLE_ALL, true, 'd', _( "Disassemble everything recursively" ),
                                 to_string_clipped( time_duration::from_turns( time_to_disassemble_all / 100 ) ) );
         }
         if( salvage_iuse && salvageables.size() > 1 ) {
