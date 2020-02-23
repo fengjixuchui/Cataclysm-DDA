@@ -1034,7 +1034,7 @@ bool player::has_alarm_clock() const
 {
     return ( has_item_with_flag( flag_ALARMCLOCK, true ) ||
              ( g->m.veh_at( pos() ) &&
-               !empty( g->m.veh_at( pos() )->vehicle().get_avail_parts( "ALARMCLOCK" ) ) ) ||
+               !empty( g->m.veh_at( pos() )->vehicle().get_avail_parts( flag_ALARMCLOCK ) ) ) ||
              has_bionic( bio_watch ) );
 }
 
@@ -1042,7 +1042,7 @@ bool player::has_watch() const
 {
     return ( has_item_with_flag( flag_WATCH, true ) ||
              ( g->m.veh_at( pos() ) &&
-               !empty( g->m.veh_at( pos() )->vehicle().get_avail_parts( "WATCH" ) ) ) ||
+               !empty( g->m.veh_at( pos() )->vehicle().get_avail_parts( flag_WATCH ) ) ) ||
              has_bionic( bio_watch ) );
 }
 
@@ -3773,6 +3773,9 @@ bool player::unload( item &it )
 
         // Construct a new ammo item and try to drop it
         item ammo( target->ammo_current(), calendar::turn, qty );
+        if( target->is_filthy() ) {
+            ammo.set_flag( "FILTHY" );
+        }
 
         if( ammo.made_of_from_type( LIQUID ) ) {
             if( !this->add_or_drop_with_msg( ammo ) ) {
