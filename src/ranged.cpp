@@ -70,6 +70,58 @@ int time_to_attack( const Character &p, const itype &firing );
 static void cycle_action( item &weap, const tripoint &pos );
 void make_gun_sound_effect( const player &p, bool burst, item *weapon );
 
+bool targeting_data::is_valid() const
+{
+    return weapon_source != WEAPON_SOURCE_INVALID;
+}
+
+targeting_data targeting_data::use_wielded()
+{
+    return targeting_data{
+        WEAPON_SOURCE_WIELDED,
+        nullptr,
+        0_J,
+    };
+}
+
+targeting_data targeting_data::use_bionic( const item &fake_gun, units::energy cost_per_shot )
+{
+    return targeting_data{
+        WEAPON_SOURCE_BIONIC,
+        shared_ptr_fast<item>( new item( fake_gun ) ),
+        cost_per_shot
+    };
+}
+
+targeting_data targeting_data::use_mutation( const item &fake_gun )
+{
+    return targeting_data{
+        WEAPON_SOURCE_MUTATION,
+        shared_ptr_fast<item>( new item( fake_gun ) ),
+        0_J
+    };
+}
+
+namespace io
+{
+template<>
+std::string enum_to_string<weapon_source_enum>( weapon_source_enum data )
+{
+    switch( data ) {
+        // *INDENT-OFF*
+        case WEAPON_SOURCE_INVALID: return "WS_INVALID";
+        case WEAPON_SOURCE_WIELDED: return "WS_WIELDED";
+        case WEAPON_SOURCE_BIONIC: return "WS_BIONIC";
+        case WEAPON_SOURCE_MUTATION: return "WS_MUTATION";
+        // *INDENT-ON*
+        case NUM_WEAPON_SOURCES:
+            break;
+    }
+    debugmsg( "Invalid weapon source" );
+    abort();
+}
+} // namespace io
+
 static double occupied_tile_fraction( m_size target_size )
 {
     switch( target_size ) {
@@ -737,7 +789,8 @@ static std::string print_recoil( const player &p )
 // returns the number of lines used to draw instructions.
 static int draw_targeting_window( const catacurses::window &w_target, const std::string &name,
                                   target_mode mode, input_context &ctxt,
-                                  const std::vector<aim_type> &aim_types, bool tiny )
+                                  const std::vector<aim_type> &aim_types, bool tiny,
+                                  bool grey_out_firing_controls = false )
 {
     draw_border( w_target );
     // Draw the "title" of the window.
@@ -792,6 +845,8 @@ static int draw_targeting_window( const catacurses::window &w_target, const std:
         return keys.empty() ? fallback : keys.front();
     };
 
+    nc_color fire_color = grey_out_firing_controls ? c_light_gray : c_white;
+
     std::string label_fire;
     if( mode == TARGET_MODE_THROW || mode == TARGET_MODE_THROW_BLIND ) {
         label_fire = to_translation( "[Hotkey] to throw", "to throw" ).translated();
@@ -802,18 +857,19 @@ static int draw_targeting_window( const catacurses::window &w_target, const std:
     } else {
         label_fire = to_translation( "[Hotkey] to fire", "to fire" ).translated();
     }
-    const char *label_cycle_targets = _( "Cycle targets" );
-    mvwprintz( w_target, point( 1, text_y++ ), c_white, "[%s] %s; [%c] %s.",
-               ctxt.get_desc( "NEXT_TARGET", 1 ), label_cycle_targets,
-               front_or( "FIRE", ' ' ), label_fire
-             );
+
+    auto label_cycle = string_format( _( "[%s] Cycle targets;" ), ctxt.get_desc( "NEXT_TARGET", 1 ) );
+    int text_x = utf8_width( label_cycle ) + 2; // '2' for border + space at the end
+    mvwprintz( w_target, point( 1, text_y ), c_white, label_cycle );
+    mvwprintz( w_target, point( text_x, text_y++ ), fire_color, "[%c] %s.", front_or( "FIRE", ' ' ),
+               label_fire );
 
     mvwprintz( w_target, point( 1, text_y++ ), c_white,
                _( "[%c] target self; [%c] toggle snap-to-target" ),
                front_or( "CENTER", ' ' ), front_or( "TOGGLE_SNAP_TO_TARGET", ' ' ) );
 
     if( mode == TARGET_MODE_FIRE ) {
-        mvwprintz( w_target, point( 1, text_y++ ), c_white, _( "[%c] to steady your aim.  (10 moves)" ),
+        mvwprintz( w_target, point( 1, text_y++ ), fire_color, _( "[%c] to steady your aim.  (10 moves)" ),
                    front_or( "AIM", ' ' ) );
         std::string aim_and_fire;
         for( const auto &e : aim_types ) {
@@ -821,7 +877,7 @@ static int draw_targeting_window( const catacurses::window &w_target, const std:
                 aim_and_fire += string_format( "[%s] ", front_or( e.action, ' ' ) );
             }
         }
-        mvwprintz( w_target, point( 1, text_y++ ), c_white, _( "%sto aim and fire" ), aim_and_fire );
+        mvwprintz( w_target, point( 1, text_y++ ), fire_color, _( "%sto aim and fire" ), aim_and_fire );
         mvwprintz( w_target, point( 1, text_y++ ), c_white, _( "[%c] to switch aiming modes." ),
                    front_or( "SWITCH_AIM", ' ' ) );
     }
@@ -834,8 +890,10 @@ static int draw_targeting_window( const catacurses::window &w_target, const std:
     }
 
     if( is_mouse_enabled() ) {
-        mvwprintz( w_target, point( 1, text_y ), c_white,
-                   _( "Mouse: LMB: Target, Wheel: Cycle, RMB: Fire" ) );
+        const char *label_mouse = "Mouse: LMB: Target, Wheel: Cycle,";
+        int text_x = utf8_width( label_mouse ) + 2; // '2' for border + space at the end
+        mvwprintz( w_target, point( 1, text_y ), c_white, label_mouse );
+        mvwprintz( w_target, point( text_x, text_y ), fire_color, _( "RMB: Fire" ) );
     }
     return lines_used;
 }
@@ -1141,12 +1199,6 @@ static int draw_throw_aim( const player &p, const catacurses::window &w, int lin
                                 range, target_size );
 }
 
-std::vector<tripoint> target_handler::target_ui( player &pc, const targeting_data &args )
-{
-    return target_ui( pc, args.mode, args.relevant, args.range,
-                      args.ammo, args.on_mode_change, args.on_ammo_change );
-}
-
 std::vector<aim_type> Character::get_aim_types( const item &gun ) const
 {
     std::vector<aim_type> aim_types = get_default_aim_type();
@@ -1248,9 +1300,7 @@ static void update_targets( player &pc, int range, std::vector<Creature *> &targ
 
 // TODO: Shunt redundant drawing code elsewhere
 std::vector<tripoint> target_handler::target_ui( player &pc, target_mode mode,
-        item *relevant, int range, const itype *ammo,
-        const target_callback &on_mode_change,
-        const target_callback &on_ammo_change )
+        item *relevant, int range, const itype *ammo, turret_data *turret )
 {
     // TODO: this should return a reference to a static vector which is cleared on each call.
     static const std::vector<tripoint> empty_result{};
@@ -1337,7 +1387,7 @@ std::vector<tripoint> target_handler::target_ui( player &pc, target_mode mode,
     // TODO: this assumes that relevant == null means firing turrets, but that may not
     // always be the case. Consider passing a name into this function.
     int num_instruction_lines = draw_targeting_window( w_target,
-                                relevant ? relevant->tname() : _( "turrets" ), mode, ctxt, aim_types, tiny );
+                                relevant ? relevant->tname() : _( "turrets" ), mode, ctxt, aim_types, tiny, src == dst );
 
     bool snap_to_target = get_option<bool>( "SNAP_TO_TARGET" );
 
@@ -1367,6 +1417,9 @@ std::vector<tripoint> target_handler::target_ui( player &pc, target_mode mode,
     };
 
     auto recalc_recoil = [&recoil_pc, &recoil_pos, &pc]( tripoint & dst ) {
+        if( pc.pos() == dst || pc.pos() == recoil_pos ) {
+            return MAX_RECOIL;
+        }
         static const double recoil_per_deg = MAX_RECOIL / 180;
 
         const double phi = fmod( std::abs( coord_to_angle( pc.pos(), dst ) -
@@ -1488,7 +1541,7 @@ std::vector<tripoint> target_handler::target_ui( player &pc, target_mode mode,
 
             // Assumes that relevant == null means firing turrets (maybe even multiple at once),
             // so printing their firing mode / ammo / ... of one of them is misleading.
-            if( relevant && mode == TARGET_MODE_FIRE ) {
+            if( relevant && mode == TARGET_MODE_FIRE && src != dst ) {
                 double predicted_recoil = pc.recoil;
                 int predicted_delay = 0;
                 if( aim_mode->has_threshold && aim_mode->threshold < pc.recoil ) {
@@ -1525,7 +1578,7 @@ std::vector<tripoint> target_handler::target_ui( player &pc, target_mode mode,
             wrefresh( g->w_terrain );
             g->draw_panels();
             draw_targeting_window( w_target, relevant ? relevant->tname() : _( "turrets" ),
-                                   mode, ctxt, aim_types, tiny );
+                                   mode, ctxt, aim_types, tiny, src == dst );
             wrefresh( w_target );
 
             catacurses::refresh();
@@ -1621,7 +1674,12 @@ std::vector<tripoint> target_handler::target_ui( player &pc, target_mode mode,
             }
             dst = t[newtarget]->pos();
             pc.recoil = recalc_recoil( dst );
-        } else if( ( action == "AIM" ) ) {
+        } else if( action == "AIM" ) {
+            if( src == dst ) {
+                // Skip this action if no target selected
+                continue;
+            }
+
             // No confirm_non_enemy_target here because we have not initiated the firing.
             // Aiming can be stopped / aborted at any time.
             recoil_pc = pc.recoil;
@@ -1640,23 +1698,37 @@ std::vector<tripoint> target_handler::target_ui( player &pc, target_mode mode,
                 return empty_result;
             }
         } else if( action == "SWITCH_MODE" ) {
-            if( !relevant || !relevant->is_gun() ) {
-                // skip this action
-            } else if( on_mode_change ) {
-                ammo = on_mode_change( relevant );
-            } else {
+            if( relevant && relevant->is_gun() ) {
                 relevant->gun_cycle_mode();
                 if( relevant->gun_current_mode().flags.count( "REACH_ATTACK" ) ) {
                     relevant->gun_cycle_mode();
                 }
-                ammo = relevant->gun_current_mode().target->ammo_data();
-                range = relevant->gun_current_mode().target->gun_range( &pc );
+                if( mode == TARGET_MODE_TURRET_MANUAL ) {
+                    itype_id ammo_current = turret->ammo_current();
+                    if( ammo_current == "null" ) {
+                        ammo = nullptr;
+                        range = 0;
+                    } else {
+                        ammo = item::find_type( ammo_current );
+                        range = turret->range();
+                    }
+                } else {
+                    ammo = relevant->gun_current_mode().target->ammo_data();
+                    range = relevant->gun_current_mode().target->gun_range( &pc );
+                }
             }
         } else if( action == "SWITCH_AMMO" ) {
             if( !relevant ) {
                 // skip this action
-            } else if( on_ammo_change ) {
-                ammo = on_ammo_change( relevant );
+            } else if( mode == TARGET_MODE_TURRET_MANUAL ) {
+                // For turrets that use vehicle tanks & can fire multiple liquids
+                if( turret->ammo_options().size() > 1 ) {
+                    const auto opts = turret->ammo_options();
+                    auto iter = opts.find( turret->ammo_current() );
+                    turret->ammo_select( ++iter != opts.end() ? *iter : *opts.begin() );
+                    ammo = item::find_type( turret->ammo_current() );
+                    range = turret->range();
+                }
             } else if( !pc.has_item( *relevant ) ) {
                 add_msg( m_info, _( "You can't reload a %s!" ), relevant->tname() );
             } else {
@@ -1671,9 +1743,14 @@ std::vector<tripoint> target_handler::target_ui( player &pc, target_mode mode,
                 aim_mode = aim_types.begin();
             }
         } else if( action == "AIMED_SHOT" || action == "CAREFUL_SHOT" || action == "PRECISE_SHOT" ) {
+            if( src == dst ) {
+                // Skip this action if no target selected
+                continue;
+            }
+
             // This action basically means "FIRE" as well, the actual firing may be delayed
             // through aiming, but there is usually no means to stop it. Therefore we query here.
-            if( !confirm_non_enemy_target( dst ) || dst == src ) {
+            if( !confirm_non_enemy_target( dst ) ) {
                 continue;
             }
 
@@ -1718,11 +1795,13 @@ std::vector<tripoint> target_handler::target_ui( player &pc, target_mode mode,
                 return empty_result;
             }
         } else if( action == "FIRE" ) {
-            if( !confirm_non_enemy_target( dst ) || dst == src ) {
+            if( src == dst ) {
+                // Skip this action if no target selected
+                // TODO: Consider allowing firing vehicle turret at yourself
                 continue;
             }
-            if( src == dst ) {
-                ret.clear();
+            if( !confirm_non_enemy_target( dst ) ) {
+                continue;
             }
             break;
         } else if( action == "CENTER" ) {
