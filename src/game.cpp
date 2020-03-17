@@ -10338,7 +10338,6 @@ cata::optional<tripoint> game::find_or_make_stairs( map &mp, const int z_after, 
     cata::optional<tripoint> stairs;
     int best = INT_MAX;
     const int movez = z_after - get_levz();
-    Creature *blocking_creature = nullptr;
     const bool going_down_1 = movez == -1;
     const bool going_up_1 = movez == 1;
     // If there are stairs on the same x and y as we currently are, use those
@@ -10348,35 +10347,28 @@ cata::optional<tripoint> game::find_or_make_stairs( map &mp, const int z_after, 
     if( going_up_1 && mp.has_flag( TFLAG_GOES_DOWN, u.pos() + tripoint_above ) ) {
         stairs.emplace( u.pos() + tripoint_above );
     }
-    if( stairs ) {
-        // We found stairs above or below, no need to do anything else
-        return stairs;
-    }
-    // Otherwise, search the map for them
-    for( const tripoint &dest : m.points_in_rectangle( omtile_align_start, omtile_align_end ) ) {
-        if( rl_dist( u.pos(), dest ) <= best &&
-            ( ( going_down_1 && mp.has_flag( TFLAG_GOES_UP, dest ) ) ||
-              ( going_up_1 && ( mp.has_flag( TFLAG_GOES_DOWN, dest ) ||
-                                mp.ter( dest ) == t_manhole_cover ) ) ||
-              ( ( movez == 2 || movez == -2 ) && mp.ter( dest ) == t_elevator ) ) ) {
-            if( mp.has_zlevels() && critter_at( dest ) ) {
-                blocking_creature = critter_at( dest );
-                continue;
+    // We did not find stairs directly above or below, so search the map for them
+    if( !stairs.has_value() ) {
+        for( const tripoint &dest : m.points_in_rectangle( omtile_align_start, omtile_align_end ) ) {
+            if( rl_dist( u.pos(), dest ) <= best &&
+                ( ( going_down_1 && mp.has_flag( TFLAG_GOES_UP, dest ) ) ||
+                  ( going_up_1 && ( mp.has_flag( TFLAG_GOES_DOWN, dest ) ||
+                                    mp.ter( dest ) == t_manhole_cover ) ) ||
+                  ( ( movez == 2 || movez == -2 ) && mp.ter( dest ) == t_elevator ) ) ) {
+                stairs.emplace( dest );
+                best = rl_dist( u.pos(), dest );
             }
-            stairs.emplace( dest );
-            best = rl_dist( u.pos(), dest );
         }
     }
 
-    if( stairs ) {
-        // Stairs found
+    if( stairs.has_value() ) {
+        if( Creature *blocking_creature = critter_at( stairs.value() ) ) {
+            add_msg( _( "There's a %s in the way!" ), blocking_creature->get_name() );
+            return cata::nullopt;
+        }
         return stairs;
     }
 
-    if( blocking_creature ) {
-        add_msg( _( "There's a %s in the way!" ), blocking_creature->disp_name() );
-        return cata::nullopt;
-    }
     // No stairs found! Try to make some
     rope_ladder = false;
     stairs.emplace( u.pos() );
@@ -10975,7 +10967,10 @@ void game::perhaps_add_random_npc()
         if( counter >= 10 ) {
             return;
         }
-        spawn_point = tripoint( rng( 0, OMAPX - 1 ), rng( 0, OMAPY - 1 ), 0 );
+        static constexpr int radius_spawn_range = 120;
+        const tripoint u_omt = u.global_omt_location();
+        spawn_point = u_omt + point( rng( -radius_spawn_range, radius_spawn_range ),
+                                     rng( -radius_spawn_range, radius_spawn_range ) );
         spawn_point.z = 0;
         const oter_id oter = overmap_buffer.ter( spawn_point );
         // shouldnt spawn on lakes or rivers.
