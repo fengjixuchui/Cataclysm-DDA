@@ -97,6 +97,8 @@ static const activity_id ACT_HACKING( "ACT_HACKING" );
 static const activity_id ACT_PICKUP( "ACT_PICKUP" );
 static const activity_id ACT_PLANT_SEED( "ACT_PLANT_SEED" );
 
+static const efftype_id effect_earphones( "earphones" );
+
 static const trap_str_id tr_unfinished_construction( "tr_unfinished_construction" );
 
 static const skill_id skill_computer( "computer" );
@@ -3421,7 +3423,7 @@ void iexamine::shrub_wildveggies( player &p, const tripoint &examp )
     ///\EFFECT_PER randomly speeds up foraging
     move_cost /= rng( std::max( 4, p.per_cur ), 4 + p.per_cur * 2 );
     p.assign_activity( ACT_FORAGE, move_cost, 0 );
-    p.activity.placement = examp;
+    p.activity.placement = g->m.getabs( examp );
     p.activity.auto_resume = true;
     return;
 }

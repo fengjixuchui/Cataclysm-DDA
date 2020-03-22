@@ -33,6 +33,7 @@
 #include "map_iterator.h"
 #include "messages.h"
 #include "morale_types.h"
+#include "mutation.h"
 #include "options.h"
 #include "output.h"
 #include "overmapbuffer.h"
@@ -68,6 +69,19 @@
 #include "cata_string_consts.h"
 
 static const activity_id ACT_OPERATION( "ACT_OPERATION" );
+
+static const efftype_id effect_adrenaline( "adrenaline" );
+static const efftype_id effect_adrenaline_mycus( "adrenaline_mycus" );
+static const efftype_id effect_assisted( "assisted" );
+static const efftype_id effect_asthma( "asthma" );
+static const efftype_id effect_bleed( "bleed" );
+static const efftype_id effect_bloodworms( "bloodworms" );
+static const efftype_id effect_brainworms( "brainworms" );
+static const efftype_id effect_cig( "cig" );
+static const efftype_id effect_datura( "datura" );
+static const efftype_id effect_dermatik( "dermatik" );
+static const efftype_id effect_drunk( "drunk" );
+static const efftype_id effect_fungus( "fungus" );
 
 static const itype_id fuel_type_battery( "battery" );
 static const itype_id fuel_type_sun_light( "sunlight" );
@@ -2013,6 +2027,20 @@ bool Character::can_install_bionics( const itype &type, player &installer, bool 
                          skill_level );
     }
     int chance_of_success = bionic_manip_cos( adjusted_skill + assist_bonus, autodoc, difficult );
+
+    std::vector<std::string> conflicting_muts;
+    for( const trait_id &mid : bioid->canceled_mutations ) {
+        if( has_trait( mid ) ) {
+            conflicting_muts.push_back( mid->name() );
+        }
+    }
+
+    if( !conflicting_muts.empty() &&
+        !query_yn(
+            _( "Installing this bionic will remove the conflicting traits: %s.  Continue anyway?" ),
+            enumerate_as_string( conflicting_muts ) ) ) {
+        return false;
+    }
 
     const std::map<body_part, int> &issues = bionic_installation_issues( bioid );
     // show all requirements which are not satisfied
