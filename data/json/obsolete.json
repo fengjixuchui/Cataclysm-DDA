@@ -98,7 +98,7 @@
     "id": "fusion_gun",
     "copy-from": "turret",
     "type": "vehicle_part",
-    "name": "mounted fusion gun",
+    "name": { "str": "mounted fusion gun" },
     "item": "ftk93",
     "color": "magenta",
     "broken_color": "magenta",
@@ -112,7 +112,7 @@
   {
     "id": "bio_blaster_gun",
     "type": "GUN",
-    "name": "fusion blaster",
+    "name": { "str": "fusion blaster" },
     "description": "this a pseudo item",
     "volume": "3 L",
     "price": 0,
@@ -136,7 +136,7 @@
     "id": "unbio_blaster_gun",
     "type": "GUN",
     "reload_noise_volume": 10,
-    "name": "fusion blaster rifle",
+    "name": { "str": "fusion blaster rifle" },
     "description": "A cyborg's fusion blaster arm, cannibalized and converted into a rifle.  This improvised weapon is powered by a standard UPS connection.",
     "weight": "2680 g",
     "volume": "2500 ml",
@@ -211,7 +211,7 @@
     "type": "AMMO",
     "id": "laser_pack",
     "price": 80000,
-    "name": "fusion pack",
+    "name": { "str": "fusion pack" },
     "symbol": "=",
     "color": "light_green",
     "description": "In the middle of the 21st Century, military powers began to look towards energy based weapons.  The result was the standard fusion pack, capable of delivering bolts of superheated gas at near light speed with no recoil.",
@@ -230,7 +230,7 @@
     "type": "AMMO",
     "id": "reloaded_laser_pack",
     "price": 80,
-    "name": "bootleg fusion pack",
+    "name": { "str": "bootleg fusion pack" },
     "symbol": "=",
     "color": "light_green",
     "description": "In the middle of the 21st Century, military powers began to look towards energy based weapons.  The result was the standard fusion pack, capable of delivering bolts of superheated gas at near light speed with no recoil.  This one has been hand-crafted from spare parts.",
@@ -277,7 +277,7 @@
     "id": "wheel_bicycle_steerable",
     "copy-from": "wheel_bicycle",
     "type": "vehicle_part",
-    "name": "bicycle wheel (steerable)",
+    "name": { "str": "bicycle wheel (steerable)" },
     "extend": { "flags": [ "STEERABLE", "NOINSTALL" ] }
   },
   {
@@ -291,7 +291,7 @@
     "id": "wheel_motorbike_steerable",
     "copy-from": "wheel_motorbike",
     "type": "vehicle_part",
-    "name": "motorbike wheel (steerable)",
+    "name": { "str": "motorbike wheel (steerable)" },
     "extend": { "flags": [ "STEERABLE", "NOINSTALL" ] }
   },
   {
@@ -358,7 +358,7 @@
   {
     "id": "metal_wheel",
     "type": "vehicle_part",
-    "name": "metal wheel",
+    "name": { "str": "metal wheel" },
     "item": "wheel_metal",
     "location": "under",
     "symbol": "|",
@@ -381,7 +381,7 @@
   {
     "type": "vehicle_part",
     "id": "plating_bone",
-    "name": "bone plating",
+    "name": { "str": "bone plating" },
     "symbol": ")",
     "color": "white",
     "broken_symbol": ")",
@@ -441,6 +441,11 @@
   },
   {
     "result": "double_plutonium_core",
+    "type": "recipe",
+    "obsolete": true
+  },
+  {
+    "result": "ring",
     "type": "recipe",
     "obsolete": true
   }
