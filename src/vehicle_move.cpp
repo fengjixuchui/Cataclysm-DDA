@@ -912,14 +912,14 @@ bool vehicle::has_harnessed_animal() const
 
 void vehicle::autodrive( int x, int y )
 {
-    // for now, autodriving is only possible when pulled by an animal
-    if( !is_towed() ) {
+    if( !is_towed() && !magic ) {
         for( size_t e = 0; e < parts.size(); e++ ) {
             const vehicle_part &vp = parts[ e ];
             if( vp.info().fuel_type == fuel_type_animal ) {
                 monster *mon = get_pet( e );
                 if( !mon || !mon->has_effect( effect_harnessed ) || !mon->has_effect( effect_pet ) ) {
                     is_following = false;
+                    return;
                 }
             }
         }
@@ -940,7 +940,6 @@ void vehicle::autodrive( int x, int y )
             return;
         }
         turn( turn_delta );
-
     }
     if( y != 0 ) {
         int thr_amount = 100 * ( abs( velocity ) < 2000 ? 4 : 5 );
@@ -980,6 +979,8 @@ bool vehicle::check_heli_descend( player &p )
         debugmsg( "A vehicle is somehow flying without being an aircraft" );
         return true;
     }
+    int count = 0;
+    int air_count = 0;
     for( const tripoint &pt : get_points( true ) ) {
         tripoint below( pt.xy(), pt.z - 1 );
         if( g->m.has_zlevels() && ( pt.z < -OVERMAP_DEPTH ||
@@ -993,8 +994,12 @@ bool vehicle::check_heli_descend( player &p )
                                  _( "It would be unsafe to try and land when there are obstacles below you." ) );
             return false;
         }
+        if( g->m.has_flag_ter_or_furn( TFLAG_NO_FLOOR, below ) ) {
+            air_count++;
+        }
+        count++;
     }
-    if( velocity > 0 ) {
+    if( velocity > 0 && air_count != count ) {
         p.add_msg_if_player( m_bad, _( "It would be unsafe to try and land while you are moving." ) );
         return false;
     }
@@ -1011,6 +1016,16 @@ bool vehicle::check_heli_ascend( player &p )
     if( velocity > 0 && !is_flying_in_air() ) {
         p.add_msg_if_player( m_bad, _( "It would be unsafe to try and take off while you are moving." ) );
         return false;
+    }
+    for( const tripoint &pt : get_points( true ) ) {
+        tripoint above( pt.xy(), pt.z + 1 );
+        const optional_vpart_position ovp = g->m.veh_at( above );
+        if( g->m.impassable_ter_furn( above ) || ovp || g->critter_at( above ) || !g->m.is_outside( pt ) ||
+            !g->m.is_outside( above ) ) {
+            p.add_msg_if_player( m_bad,
+                                 _( "It would be unsafe to try and ascend when there are obstacles above you." ) );
+            return false;
+        }
     }
     return true;
 }
@@ -1379,7 +1394,9 @@ vehicle *vehicle::act_on_map()
         is_falling = false;
         return this;
     }
-
+    if( decrement_summon_timer() ) {
+        return nullptr;
+    }
     const bool pl_ctrl = player_in_control( g->u );
     // TODO: Remove this hack, have vehicle sink a z-level
     if( is_floating && !can_float() ) {
