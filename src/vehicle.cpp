@@ -637,8 +637,7 @@ void vehicle::init_state( int init_veh_fuel, int init_veh_status )
 
 void vehicle::activate_magical_follow()
 {
-    for( size_t e = 0; e < parts.size(); e++ ) {
-        vehicle_part &vp = parts[ e ];
+    for( vehicle_part &vp : parts ) {
         if( vp.info().fuel_type == fuel_type_mana ) {
             vp.enabled = true;
             is_following = true;
@@ -2778,7 +2777,7 @@ std::vector<int> vehicle::all_parts_at_location( const std::string &location ) c
 }
 
 // another NPC probably removed a part in the time it took to walk here and start the activity.
-// as the part index was first "chosen" before the NPC started travelling here.
+// as the part index was first "chosen" before the NPC started traveling here.
 // therefore the part index is now invalid shifted by one or two ( depending on how many other NPCs working on this vehicle )
 // so loop over the part indexes in reverse order to get the next one down that matches the part type we wanted to remove
 int vehicle::get_next_shifted_index( int original_index, player &p )
@@ -5169,11 +5168,7 @@ cata::optional<vehicle_stack::iterator> vehicle::add_item( int part, const item 
     item itm_copy = itm;
 
     if( itm_copy.is_bucket_nonempty() ) {
-        for( auto &elem : itm_copy.contents ) {
-            g->m.add_item_or_charges( global_part_pos3( part ), elem );
-        }
-
-        itm_copy.contents.clear();
+        itm_copy.contents.spill_contents( global_part_pos3( part ) );
     }
 
     const vehicle_stack::iterator new_pos = p.items.insert( itm_copy );
@@ -5273,7 +5268,7 @@ void vehicle::place_spawn_items()
                                           !e.magazine_current();
 
                         if( spawn_mag ) {
-                            e.contents.emplace_back( e.magazine_default(), e.birthday() );
+                            e.put_in( item( e.magazine_default(), e.birthday() ) );
                         }
                         if( spawn_ammo ) {
                             e.ammo_set( e.ammo_default() );
@@ -6128,7 +6123,7 @@ int vehicle::damage( int p, int dmg, damage_type type, bool aimed )
         }
     }
 
-    int target_part = random_entry( pl );
+    int target_part = part_info( p ).rotor_diameter() ? p : random_entry( pl );
 
     // door motor mechanism is protected by closed doors
     if( part_flag( target_part, "DOOR_MOTOR" ) ) {

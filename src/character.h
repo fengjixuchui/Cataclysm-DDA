@@ -506,11 +506,6 @@ class Character : public Creature, public visitable<Character>
         /** Handles stat and bonus reset. */
         void reset() override;
 
-        /** Picks a random body part, adjusting for mutations, broken body parts etc. */
-        body_part get_random_body_part( bool main ) const override;
-        /** Returns all body parts this character has, in order they should be displayed. */
-        std::vector<body_part> get_all_body_parts( bool only_main = false ) const override;
-
         /** Recalculates encumbrance cache. */
         void reset_encumbrance();
         /** Returns ENC provided by armor, etc. */
@@ -912,7 +907,7 @@ class Character : public Creature, public visitable<Character>
         void update_fuel_storage( const itype_id &fuel );
         /**Get stat bonus from bionic*/
         int get_mod_stat_from_bionic( const Character::stat &Stat ) const;
-        // route for overmap-scale travelling
+        // route for overmap-scale traveling
         std::vector<tripoint> omt_path;
 
         /** Handles bionic effects over time of the entered bionic */
@@ -1162,7 +1157,7 @@ class Character : public Creature, public visitable<Character>
          * @return A copy of the removed item.
          */
         item i_rem( const item *it );
-        void i_rem_keep_contents( int pos );
+        void i_rem_keep_contents( int idx );
         /** Sets invlet and adds to inventory if possible, drops otherwise, returns true if either succeeded.
          *  An optional qty can be provided (and will perform better than separate calls). */
         bool i_add_or_drop( item &it, int qty = 1 );
