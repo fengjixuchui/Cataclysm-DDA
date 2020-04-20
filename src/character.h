@@ -655,6 +655,7 @@ class Character : public Creature, public visitable<Character>
         std::string melee_special_effects( Creature &t, damage_instance &d, item &weap );
         /** Performs special attacks and their effects (poisonous, stinger, etc.) */
         void perform_special_attacks( Creature &t, dealt_damage_instance &dealt_dam );
+        bool reach_attacking = false;
 
         /** Returns a vector of valid mutation attacks */
         std::vector<special_attack> mutation_attacks( Creature &t ) const;
@@ -697,7 +698,7 @@ class Character : public Creature, public visitable<Character>
         void did_hit( Creature &target );
 
         /** Actually hurt the player, hurts a body_part directly, no armor reduction */
-        void apply_damage( Creature *source, body_part hurt, int dam,
+        void apply_damage( Creature *source, bodypart_id hurt, int dam,
                            bool bypass_med = false ) override;
         /** Calls Creature::deal_damage and handles damaged effects (waking up, etc.) */
         dealt_damage_instance deal_damage( Creature *source, body_part bp,
