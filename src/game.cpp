@@ -557,9 +557,6 @@ void game::init_ui( const bool resized )
     w_minimap = w_minimap_ptr = catacurses::newwin( MINIMAP_HEIGHT, MINIMAP_WIDTH, point( _x, _y ) );
     werase( w_minimap );
 
-    w_panel_adm = w_panel_adm_ptr = catacurses::newwin( 20, 75, point( ( TERMX / 2 ) - 38,
-                                    ( TERMY / 2 ) - 10 ) );
-    werase( w_panel_adm );
     // need to init in order to avoid crash. gets updated by the panel code.
     w_pixel_minimap = catacurses::newwin( 1, 1, point_zero );
     liveview.init();
@@ -593,11 +590,6 @@ void game::toggle_pixel_minimap()
     init_ui();
     refresh_all();
 #endif // TILES
-}
-
-void game::toggle_panel_adm()
-{
-    show_panel_adm = !show_panel_adm;
 }
 
 void game::reload_tileset()
@@ -955,7 +947,7 @@ void game::load_npcs()
         if( temp->is_active() ) {
             continue;
         }
-        if( ( temp->has_companion_mission() ) && ( temp->mission != NPC_MISSION_TRAVELLING ) ) {
+        if( temp->has_companion_mission() ) {
             continue;
         }
 
@@ -3303,11 +3295,6 @@ void game::draw()
 
 void game::draw_panels( bool force_draw )
 {
-    draw_panels( 0, 1, force_draw );
-}
-
-void game::draw_panels( size_t column, size_t index, bool force_draw )
-{
     static int previous_turn = -1;
     const int current_turn = to_turns<int>( calendar::turn - calendar::turn_zero );
     const bool draw_this_turn = current_turn > previous_turn || force_draw;
@@ -3360,9 +3347,6 @@ void game::draw_panels( size_t column, size_t index, bool force_draw )
                 y += h;
             }
         }
-    }
-    if( show_panel_adm ) {
-        mgr.draw_adm( w_panel_adm, column, index );
     }
     previous_turn = current_turn;
 }
@@ -3635,7 +3619,7 @@ void game::draw_minimap()
         double slope = ( cursx != targ.x ) ? static_cast<double>( targ.y - cursy ) / static_cast<double>
                        ( targ.x - cursx ) : 4;
 
-        if( cursx == targ.x || fabs( slope ) > 3.5 ) { // Vertical slope
+        if( cursx == targ.x || std::fabs( slope ) > 3.5 ) { // Vertical slope
             if( targ.y > cursy ) {
                 mvwputch( w_minimap, point( 3, 6 ), c_red, "*" );
             } else {
@@ -3644,7 +3628,7 @@ void game::draw_minimap()
         } else {
             int arrowx = -1;
             int arrowy = -1;
-            if( fabs( slope ) >= 1. ) { // y diff is bigger!
+            if( std::fabs( slope ) >= 1. ) { // y diff is bigger!
                 arrowy = ( targ.y > cursy ? 6 : 0 );
                 arrowx = static_cast<int>( 3 + 3 * ( targ.y > cursy ? slope : ( 0 - slope ) ) );
                 if( arrowx < 0 ) {
@@ -10701,7 +10685,7 @@ point game::update_map( int &x, int &y )
         }
     }
 
-    scent.shift( shift_ms.x, shift_ms.y );
+    scent.shift( shift_ms );
 
     // Also ensure the player is on current z-level
     // get_levz() should later be removed, when there is no longer such a thing
@@ -11050,10 +11034,10 @@ void game::perhaps_add_random_npc()
 
     float density = get_option<float>( "NPC_DENSITY" );
     static constexpr int density_search_radius = 60;
-    const int npc_num = overmap_buffer.get_npcs_near_player( density_search_radius ).size();
-    if( npc_num > 0 ) {
+    const float npc_num = overmap_buffer.get_npcs_near_player( density_search_radius ).size();
+    if( npc_num > 0.0 ) {
         // 100%, 80%, 64%, 52%, 41%, 33%...
-        density *= powf( 0.8f, npc_num );
+        density *= std::pow( 0.8f, npc_num );
     }
 
     if( !x_in_y( density, 100 ) ) {
@@ -11555,21 +11539,21 @@ void game::start_calendar()
     if( scen_season ) {
         // Configured starting date overridden by scenario, calendar::start is left as Spring 1
         calendar::start_of_cataclysm = calendar::turn_zero + 1_hours * get_option<int>( "INITIAL_TIME" );
-        calendar::turn = calendar::turn_zero + 1_hours * get_option<int>( "INITIAL_TIME" );
+        calendar::start_of_game = calendar::turn_zero + 1_hours * get_option<int>( "INITIAL_TIME" );
         if( scen->has_flag( "SPR_START" ) ) {
             calendar::initial_season = SPRING;
         } else if( scen->has_flag( "SUM_START" ) ) {
             calendar::initial_season = SUMMER;
-            calendar::turn += calendar::season_length();
+            calendar::start_of_game += calendar::season_length();
         } else if( scen->has_flag( "AUT_START" ) ) {
             calendar::initial_season = AUTUMN;
-            calendar::turn += calendar::season_length() * 2;
+            calendar::start_of_game += calendar::season_length() * 2;
         } else if( scen->has_flag( "WIN_START" ) ) {
             calendar::initial_season = WINTER;
-            calendar::turn += calendar::season_length() * 3;
+            calendar::start_of_game += calendar::season_length() * 3;
         } else if( scen->has_flag( "SUM_ADV_START" ) ) {
             calendar::initial_season = SUMMER;
-            calendar::turn += calendar::season_length() * 5;
+            calendar::start_of_game += calendar::season_length() * 5;
         } else {
             debugmsg( "The Unicorn" );
         }
@@ -11595,11 +11579,12 @@ void game::start_calendar()
             calendar::initial_season = WINTER;
         }
 
-        calendar::turn = calendar::start_of_cataclysm
-                         + 1_hours * get_option<int>( "INITIAL_TIME" )
-                         + 1_days * get_option<int>( "SPAWN_DELAY" );
+        calendar::start_of_game = calendar::start_of_cataclysm
+                                  + 1_hours * get_option<int>( "INITIAL_TIME" )
+                                  + 1_days * get_option<int>( "SPAWN_DELAY" );
     }
 
+    calendar::turn = calendar::start_of_game;
 }
 
 void game::add_artifact_messages( const std::vector<art_effect_passive> &effects )
