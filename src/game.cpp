@@ -260,7 +260,7 @@ bool is_valid_in_w_terrain( const point &p )
 static void achievement_attained( const achievement *a )
 {
     g->u.add_msg_if_player( m_good, _( "You completed the achievement \"%s\"." ),
-                            a->description() );
+                            a->name() );
 }
 
 // This is the main game set-up process.
@@ -2751,7 +2751,7 @@ bool game::load( const std::string &world )
     return true;
 }
 
-void game::load( const save_t &name )
+bool game::load( const save_t &name )
 {
     background_pane background;
     static_popup popup;
@@ -2771,7 +2771,7 @@ void game::load( const save_t &name )
     // This should be initialized more globally (in player/Character constructor)
     u.weapon = item( "null", 0 );
     if( !read_from_file( playerpath + SAVE_EXTENSION, std::bind( &game::unserialize, this, _1 ) ) ) {
-        return;
+        return false;
     }
 
     read_from_file_optional_json( playerpath + SAVE_EXTENSION_MAP_MEMORY, [&]( JsonIn & jsin ) {
@@ -2837,6 +2837,8 @@ void game::load( const save_t &name )
     calendar::set_season_length( ::get_option<int>( "SEASON_LENGTH" ) );
 
     u.reset();
+
+    return true;
 }
 
 void game::load_world_modfiles( loading_ui &ui )
@@ -10474,6 +10476,8 @@ void game::vertical_move( int movez, bool force )
     refresh_all();
     // Upon force movement, traps can not be avoided.
     m.creature_on_trap( u, !force );
+
+    cata_event_dispatch::avatar_moves( u, m, u.pos() );
 }
 
 void game::start_hauling( const tripoint &pos )
@@ -12095,6 +12099,6 @@ void avatar_moves( const avatar &u, const map &m, const tripoint &p )
         mount_type = u.mounted_creature->type->id;
     }
     g->events().send<event_type::avatar_moves>( mount_type, m.ter( p ).id(),
-            u.get_movement_mode(), u.is_underwater() );
+            u.get_movement_mode(), u.is_underwater(), p.z );
 }
 } // namespace cata_event_dispatch

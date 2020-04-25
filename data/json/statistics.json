@@ -7,6 +7,20 @@
     "field": "avatar_id"
   },
   {
+    "id": "avatar_wakes_up",
+    "type": "event_transformation",
+    "event_type": "character_wakes_up",
+    "value_constraints": { "character": { "equals_statistic": "avatar_id" } },
+    "drop_fields": [ "character" ]
+  },
+  {
+    "id": "num_avatar_wake_ups",
+    "type": "event_statistic",
+    "stat_type": "count",
+    "event_transformation": "avatar_wakes_up",
+    "description": "times woken up"
+  },
+  {
     "id": "avatar_kills",
     "type": "event_transformation",
     "event_type": "character_kills_monster",
@@ -190,5 +204,29 @@
     "stat_type": "count",
     "event_transformation": "moves_sharp_terrain",
     "description": "moves through sharp terrain"
+  },
+  {
+    "id": "min_move_z",
+    "type": "event_statistic",
+    "stat_type": "minimum",
+    "field": "z",
+    "event_type": "avatar_moves",
+    "description": "minimum z level reached"
+  },
+  {
+    "id": "max_move_z",
+    "type": "event_statistic",
+    "stat_type": "maximum",
+    "field": "z",
+    "event_type": "avatar_moves",
+    "description": "maximum z level reached"
+  },
+  {
+    "id": "min_move_underwater_z",
+    "type": "event_statistic",
+    "stat_type": "minimum",
+    "field": "z",
+    "event_transformation": "moves_swam_underwater",
+    "description": "minimum z level reached underwater"
   }
 ]
