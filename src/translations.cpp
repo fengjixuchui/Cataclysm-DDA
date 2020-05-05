@@ -698,5 +698,15 @@ std::string operator+( const translation &lhs, const translation &rhs )
 
 bool localized_comparator::operator()( const std::string &l, const std::string &r ) const
 {
+#if defined(MACOSX)
+    CFStringRef lr = CFStringCreateWithCStringNoCopy( kCFAllocatorDefault, l.c_str(),
+                     kCFStringEncodingUTF8, kCFAllocatorNull );
+    CFStringRef rr = CFStringCreateWithCStringNoCopy( kCFAllocatorDefault, r.c_str(),
+                     kCFStringEncodingUTF8, kCFAllocatorNull );
+    bool result = CFStringCompare( lr, rr, kCFCompareLocalized ) < 0;
+    CFRelease( lr );
+    CFRelease( rr );
+    return result;
+#endif
     return std::locale()( l, r );
 }
