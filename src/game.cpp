@@ -183,6 +183,8 @@ static constexpr int DANGEROUS_PROXIMITY = 5;
 /** Will be set to true when running unit tests */
 bool test_mode = false;
 
+static const activity_id ACT_OPERATION( "ACT_OPERATION" );
+
 static const mtype_id mon_manhack( "mon_manhack" );
 
 static const skill_id skill_melee( "melee" );
@@ -2066,7 +2068,9 @@ static void handle_contents_changed( item_location acted_item )
 * @param iWidth width of the item info window (height = height of terminal)
 * @return getch
 */
-int game::inventory_item_menu( item_location locThisItem, int iStartX, int iWidth,
+int game::inventory_item_menu( item_location locThisItem,
+                               const std::function<int()> &iStartX,
+                               const std::function<int()> &iWidth,
                                const inventory_item_menu_positon position )
 {
     int cMenu = static_cast<int>( '+' );
@@ -2150,9 +2154,9 @@ int game::inventory_item_menu( item_location locThisItem, int iStartX, int iWidt
                 case RIGHT_TERMINAL_EDGE:
                     return 0;
                 case LEFT_OF_INFO:
-                    return iStartX - popup_width;
+                    return iStartX() - popup_width;
                 case RIGHT_OF_INFO:
-                    return iStartX + iWidth;
+                    return iStartX() + iWidth();
                 case LEFT_TERMINAL_EDGE:
                     return TERMX - popup_width;
             }
@@ -2168,18 +2172,19 @@ int game::inventory_item_menu( item_location locThisItem, int iStartX, int iWidt
         catacurses::window w_info;
         int iScrollHeight = 0;
 
-        ui_adaptor ui;
-        ui.on_screen_resize( [&]( ui_adaptor & ui ) {
-            w_info = catacurses::newwin( TERMY, iWidth, point( iStartX, 0 ) );
+        std::unique_ptr<ui_adaptor> ui = std::make_unique<ui_adaptor>();
+        ui->on_screen_resize( [&]( ui_adaptor & ui ) {
+            w_info = catacurses::newwin( TERMY, iWidth(), point( iStartX(), 0 ) );
             iScrollHeight = TERMY - 2;
             ui.position_from_window( w_info );
         } );
-        ui.mark_resize();
+        ui->mark_resize();
 
-        ui.on_redraw( [&]( const ui_adaptor & ) {
+        ui->on_redraw( [&]( const ui_adaptor & ) {
             draw_item_info( w_info, data );
         } );
 
+        bool exit = false;
         do {
             const int prev_selected = action_menu.selected;
             action_menu.query( false );
@@ -2198,6 +2203,11 @@ int game::inventory_item_menu( item_location locThisItem, int iStartX, int iWidt
                 action_menu.vshift = 0;
             } else {
                 cMenu = 0;
+            }
+
+            if( action_menu.ret != UILIST_WAIT_INPUT && action_menu.ret != UILIST_UNBOUND ) {
+                exit = true;
+                ui = nullptr;
             }
 
             switch( cMenu ) {
@@ -2232,7 +2242,7 @@ int game::inventory_item_menu( item_location locThisItem, int iStartX, int iWidt
                     handle_contents_changed( locThisItem );
                     break;
                 case 'U':
-                    unload( oThisItem );
+                    unload( locThisItem );
                     handle_contents_changed( locThisItem );
                     break;
                 case 'r':
@@ -2274,11 +2284,15 @@ int game::inventory_item_menu( item_location locThisItem, int iStartX, int iWidt
                     break;
                 case KEY_PPAGE:
                     iScrollPos -= iScrollHeight;
-                    ui.invalidate_ui();
+                    if( ui ) {
+                        ui->invalidate_ui();
+                    }
                     break;
                 case KEY_NPAGE:
                     iScrollPos += iScrollHeight;
-                    ui.invalidate_ui();
+                    if( ui ) {
+                        ui->invalidate_ui();
+                    }
                     break;
                 case '+':
                     if( !bHPR ) {
@@ -2297,7 +2311,7 @@ int game::inventory_item_menu( item_location locThisItem, int iStartX, int iWidt
                 default:
                     break;
             }
-        } while( action_menu.ret == UILIST_WAIT_INPUT || action_menu.ret == UILIST_UNBOUND );
+        } while( !exit );
     }
     return cMenu;
 }
@@ -4374,7 +4388,7 @@ void game::monmove()
         if( !guy.has_effect( effect_npc_suspend ) ) {
             guy.process_turn();
         }
-        while( !guy.is_dead() && ( !guy.in_sleep_state() || guy.activity.id() == "ACT_OPERATION" ) &&
+        while( !guy.is_dead() && ( !guy.in_sleep_state() || guy.activity.id() == ACT_OPERATION ) &&
                guy.moves > 0 && turns < 10 ) {
             int moves = guy.moves;
             guy.move();
@@ -5070,11 +5084,6 @@ void game::save_cyborg( item *cyborg, const tripoint &couch_pos, player &install
 {
     int assist_bonus = installer.get_effect_int( effect_assisted );
 
-    float adjusted_skill = installer.bionics_adjusted_skill( skill_firstaid,
-                           skill_computer,
-                           skill_electronics,
-                           -1 );
-
     int damage = cyborg->damage();
     int dmg_lvl = cyborg->damage_level( 4 );
     int difficulty = 12;
@@ -5088,7 +5097,8 @@ void game::save_cyborg( item *cyborg, const tripoint &couch_pos, player &install
         difficulty += dmg_lvl;
     }
 
-    int chance_of_success = bionic_manip_cos( adjusted_skill + assist_bonus, difficulty );
+    int chance_of_success = bionic_success_chance( true, -1, std::max( 0,
+                            difficulty - 4 * assist_bonus ), installer );
     int success = chance_of_success - rng( 1, 100 );
 
     if( !g->u.query_yn(
@@ -5115,7 +5125,7 @@ void game::save_cyborg( item *cyborg, const tripoint &couch_pos, player &install
 
     } else {
         const int failure_level = static_cast<int>( std::sqrt( std::abs( success ) * 4.0 * difficulty /
-                                  adjusted_skill ) );
+                                  installer.bionics_adjusted_skill( true, 12 ) ) );
         const int fail_type = std::min( 5, failure_level );
         switch( fail_type ) {
             case 1:
@@ -6247,8 +6257,14 @@ void game::zones_manager()
     catacurses::window w_zones_info_border;
     catacurses::window w_zones_options;
 
+    bool show = true;
+
     ui_adaptor ui;
     ui.on_screen_resize( [&]( ui_adaptor & ui ) {
+        if( !show ) {
+            ui.position( point_zero, point_zero );
+            return;
+        }
         offsetX = get_option<std::string>( "SIDEBAR_POSITION" ) == "left" ?
                   TERMX - width : 0;
         const int w_zone_height = TERMY - zone_ui_height;
@@ -6336,11 +6352,19 @@ void game::zones_manager()
         wrefresh( w_zones_options );
     };
 
-    std::string zones_info_msg;
-
     auto query_position =
-    [this, &zones_info_msg]() -> cata::optional<std::pair<tripoint, tripoint>> {
-        zones_info_msg = _( "Select first point." );
+    [&]() -> cata::optional<std::pair<tripoint, tripoint>> {
+        on_out_of_scope invalidate_current_ui( [&]()
+        {
+            ui.mark_resize();
+        } );
+        restore_on_out_of_scope<bool> show_prev( show );
+        show = false;
+        ui.mark_resize();
+
+        static_popup popup;
+        popup.on_top( true );
+        popup.message( "%s", _( "Select first point." ) );
 
         tripoint center = u.pos() + u.view_offset;
 
@@ -6348,7 +6372,7 @@ void game::zones_manager()
                 false );
         if( first.position )
         {
-            zones_info_msg = _( "Select second point." );
+            popup.message( "%s", _( "Select second point." ) );
 
             const look_around_result second = look_around( /*show_window=*/false, center, *first.position,
                     true, true, false );
@@ -6363,26 +6387,19 @@ void game::zones_manager()
                                                 std::max( first.position->y, second.position->y ),
                                                 std::max( first.position->z,
                                                         second.position->z ) ) );
-                zones_info_msg.clear();
-
                 return std::pair<tripoint, tripoint>( first_abs, second_abs );
             }
         }
-
-        zones_info_msg.clear();
 
         return cata::nullopt;
     };
 
     ui.on_redraw( [&]( const ui_adaptor & ) {
-        zones_manager_draw_borders( w_zones_border, w_zones_info_border, zone_ui_height, width );
-        if( zones_info_msg.empty() ) {
-            zones_manager_shortcuts( w_zones_info );
-        } else {
-            werase( w_zones_info );
-            mvwprintz( w_zones_info, point( 2, 3 ), c_white, zones_info_msg );
-            wrefresh( w_zones_info );
+        if( !show ) {
+            return;
         }
+        zones_manager_draw_borders( w_zones_border, w_zones_info_border, zone_ui_height, width );
+        zones_manager_shortcuts( w_zones_info );
 
         if( zone_cnt == 0 ) {
             werase( w_zones );
@@ -8685,9 +8702,9 @@ void game::reload_weapon( bool try_everything )
     reload_item();
 }
 
-bool game::unload( item &it )
+bool game::unload( item_location &loc )
 {
-    return u.unload( it );
+    return u.unload( loc );
 }
 
 void game::wield( item_location loc )

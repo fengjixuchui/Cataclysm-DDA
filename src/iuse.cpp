@@ -1297,8 +1297,7 @@ static void marloss_common( player &p, item &it, const trait_id &current_color )
     } else if( effect <= 6 ) { // Radiation cleanse is below
         p.add_msg_if_player( m_good, _( "You feel better all over." ) );
         p.mod_painkiller( 30 );
-        iuse dummy;
-        dummy.purifier( &p, &it, false, p.pos() );
+        iuse::purifier( &p, &it, false, p.pos() );
         if( effect == 6 ) {
             p.set_rad( 0 );
         }
@@ -1444,7 +1443,7 @@ int iuse::mycus( player *p, item *it, bool t, const tripoint &pos )
                               _( "It tastes amazing, and you finish it quickly." ) );
         p->add_msg_if_player( m_good, _( "You feel better all over." ) );
         p->mod_painkiller( 30 );
-        this->purifier( p, it, t, pos ); // Clear out some of that goo you may have floating around
+        iuse::purifier( p, it, t, pos ); // Clear out some of that goo you may have floating around
         p->set_rad( 0 );
         p->healall( 4 ); // Can't make you a whole new person, but not for lack of trying
         p->add_msg_if_player( m_good,
@@ -1729,7 +1728,7 @@ int iuse::remove_all_mods( player *p, item *, bool, const tripoint & )
         return 0;
     }
 
-    if( !loc->ammo_remaining() || g->unload( *loc ) ) {
+    if( !loc->ammo_remaining() || g->unload( loc ) ) {
         item *mod = loc->contents.get_item_with(
         []( const item & e ) {
             return e.is_toolmod() && !e.is_irremovable();
@@ -6093,7 +6092,7 @@ int iuse::toolmod_attach( player *p, item *it, bool, const tripoint & )
     }
 
     if( loc->ammo_remaining() ) {
-        if( !g->unload( *loc ) ) {
+        if( !g->unload( loc ) ) {
             p->add_msg_if_player( m_info, _( "You cancel unloading the tool." ) );
             return 0;
         }
