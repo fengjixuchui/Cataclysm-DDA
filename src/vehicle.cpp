@@ -90,6 +90,12 @@ static const bionic_id bio_jointservo( "bio_jointservo" );
 static const efftype_id effect_harnessed( "harnessed" );
 static const efftype_id effect_winded( "winded" );
 
+static const itype_id itype_battery( "battery" );
+static const itype_id itype_plut_cell( "plut_cell" );
+static const itype_id itype_water( "water" );
+static const itype_id itype_water_clean( "water_clean" );
+static const itype_id itype_water_purifier( "water_purifier" );
+
 static const std::string flag_PERPETUAL( "PERPETUAL" );
 
 static bool is_sm_tile_outside( const tripoint &real_global_pos );
@@ -500,37 +506,43 @@ void vehicle::init_state( int init_veh_fuel, int init_veh_status )
         }
 
         if( pt.is_reactor() ) {
+            const ammotype plut( "plut_cell" );
             if( veh_fuel_mult == 100 ) { // Mint condition vehicle
-                pt.ammo_set( "plut_cell", pt.ammo_capacity() );
+                pt.ammo_set( itype_plut_cell );
             } else if( one_in( 2 ) && veh_fuel_mult > 0 ) { // Randomize charge a bit
-                pt.ammo_set( "plut_cell", pt.ammo_capacity() * ( veh_fuel_mult + rng( 0, 10 ) ) / 100 );
+                pt.ammo_set( itype_plut_cell, pt.ammo_capacity( plut ) * ( veh_fuel_mult + rng( 0, 10 ) ) / 100 );
             } else if( one_in( 2 ) && veh_fuel_mult > 0 ) {
-                pt.ammo_set( "plut_cell", pt.ammo_capacity() * ( veh_fuel_mult - rng( 0, 10 ) ) / 100 );
+                pt.ammo_set( itype_plut_cell, pt.ammo_capacity( plut ) * ( veh_fuel_mult - rng( 0, 10 ) ) / 100 );
             } else {
-                pt.ammo_set( "plut_cell", pt.ammo_capacity() * veh_fuel_mult / 100 );
+                pt.ammo_set( itype_plut_cell, pt.ammo_capacity( plut ) * veh_fuel_mult / 100 );
             }
         }
 
         if( pt.is_battery() ) {
+            const ammotype battery( "battery" );
             if( veh_fuel_mult == 100 ) { // Mint condition vehicle
-                pt.ammo_set( "battery", pt.ammo_capacity() );
+                pt.ammo_set( itype_battery );
             } else if( one_in( 2 ) && veh_fuel_mult > 0 ) { // Randomize battery ammo a bit
-                pt.ammo_set( "battery", pt.ammo_capacity() * ( veh_fuel_mult + rng( 0, 10 ) ) / 100 );
+                pt.ammo_set( itype_battery, pt.ammo_capacity( battery ) * ( veh_fuel_mult + rng( 0, 10 ) ) / 100 );
             } else if( one_in( 2 ) && veh_fuel_mult > 0 ) {
-                pt.ammo_set( "battery", pt.ammo_capacity() * ( veh_fuel_mult - rng( 0, 10 ) ) / 100 );
+                pt.ammo_set( itype_battery, pt.ammo_capacity( battery ) * ( veh_fuel_mult - rng( 0, 10 ) ) / 100 );
             } else {
-                pt.ammo_set( "battery", pt.ammo_capacity() * veh_fuel_mult / 100 );
+                pt.ammo_set( itype_battery, pt.ammo_capacity( battery ) * veh_fuel_mult / 100 );
             }
         }
 
-        if( pt.is_tank() && type->parts[p].fuel != "null" ) {
-            int qty = pt.ammo_capacity() * veh_fuel_mult / 100;
-            qty *= std::max( item::find_type( type->parts[p].fuel )->stack_size, 1 );
-            qty /= to_milliliter( units::legacy_volume_factor );
-            pt.ammo_set( type->parts[ p ].fuel, qty );
-        } else if( pt.is_fuel_store() && type->parts[p].fuel != "null" ) {
-            int qty = pt.ammo_capacity() * veh_fuel_mult / 100;
-            pt.ammo_set( type->parts[ p ].fuel, qty );
+        if( !type->parts[p].fuel.is_null() ) {
+            const itype *loaded = item::find_type( type->parts[p].fuel );
+            const ammotype loaded_ammotype = loaded->ammo->type;
+            if( pt.is_tank() ) {
+                int qty = pt.ammo_capacity( loaded_ammotype ) * veh_fuel_mult / 100;
+                qty *= std::max( loaded->stack_size, 1 );
+                qty /= to_milliliter( units::legacy_volume_factor );
+                pt.ammo_set( type->parts[p].fuel, qty );
+            } else if( pt.is_fuel_store() ) {
+                int qty = pt.ammo_capacity( loaded_ammotype ) * veh_fuel_mult / 100;
+                pt.ammo_set( type->parts[p].fuel, qty );
+            }
         }
 
         if( vp.has_feature( "OPENABLE" ) ) { // doors are closed
@@ -1125,7 +1137,7 @@ bool vehicle::has_engine_conflict( const vpart_info *possible_conflict,
 
 bool vehicle::is_engine_type( const int e, const itype_id  &ft ) const
 {
-    return parts[engines[e]].ammo_current() == "null" ? parts[engines[e]].fuel_current() == ft :
+    return parts[engines[e]].ammo_current().is_null() ? parts[engines[e]].fuel_current() == ft :
            parts[engines[e]].ammo_current() == ft;
 }
 
@@ -3273,7 +3285,8 @@ int vehicle::fuel_capacity( const itype_id &ftype ) const
 {
     return std::accumulate( parts.begin(), parts.end(), 0, [&ftype]( const int &lhs,
     const vehicle_part & rhs ) {
-        return lhs + ( rhs.ammo_current() == ftype ? rhs.ammo_capacity() : 0 );
+        return lhs + ( rhs.ammo_current() == ftype ? rhs.ammo_capacity( item::find_type(
+                           ftype )->ammo->type ) : 0 );
     } );
 }
 
@@ -3920,6 +3933,7 @@ double vehicle::coeff_air_drag() const
             d_check_max( drag[ col ].panel, pa, pa.info().has_flag( "SOLAR_PANEL" ) );
             d_check_max( drag[ col ].windmill, pa, pa.info().has_flag( "WIND_TURBINE" ) );
             d_check_max( drag[ col ].rotor, pa, pa.info().has_flag( "ROTOR" ) );
+            d_check_max( drag[ col ].rotor, pa, pa.info().has_flag( "ROTOR_SIMPLE" ) );
             d_check_max( drag[ col ].sail, pa, pa.info().has_flag( "WIND_POWERED" ) );
             d_check_max( drag[ col ].exposed, pa, d_exposed( pa ) );
             d_check_min( drag[ col ].last, pa, pa.info().has_flag( "LOW_FINAL_AIR_DRAG" ) ||
@@ -4081,12 +4095,28 @@ bool vehicle::has_sufficient_rotorlift() const
 
 bool vehicle::is_rotorcraft() const
 {
-    return has_part( "ROTOR" ) && has_sufficient_rotorlift() && player_in_control( g->u );
+    return ( has_part( "ROTOR" ) || has_part( "ROTOR_SIMPLE" ) ) && has_sufficient_rotorlift() &&
+           player_in_control( g->u );
+}
+
+bool vehicle::is_flyable() const
+{
+    return flyable;
+}
+
+void vehicle::set_flyable( bool val )
+{
+    flyable = val;
 }
 
 int vehicle::get_z_change() const
 {
     return requested_z_change;
+}
+
+bool vehicle::would_prevent_flyable( const vpart_info &vpinfo ) const
+{
+    return is_flyable() && has_part( "ROTOR" ) && !vpinfo.has_flag( "SIMPLE_PART" );
 }
 
 bool vehicle::is_flying_in_air() const
@@ -4875,8 +4905,9 @@ int vehicle::charge_battery( int amount, bool include_other_vehicles )
     // Key parts by percentage charge level.
     std::multimap<int, vehicle_part *> chargeable_parts;
     for( vehicle_part &p : parts ) {
-        if( p.is_available() && p.is_battery() && p.ammo_capacity() > p.ammo_remaining() ) {
-            chargeable_parts.insert( { ( p.ammo_remaining() * 100 ) / p.ammo_capacity(), &p } );
+        if( p.is_available() && p.is_battery() &&
+            p.ammo_capacity( ammotype( "battery" ) ) > p.ammo_remaining() ) {
+            chargeable_parts.insert( { ( p.ammo_remaining() * 100 ) / p.ammo_capacity( ammotype( "battery" ) ), &p } );
         }
     }
     while( amount > 0 && !chargeable_parts.empty() ) {
@@ -4887,13 +4918,13 @@ int vehicle::charge_battery( int amount, bool include_other_vehicles )
         chargeable_parts.erase( iter );
         // Calculate number of charges to reach the next %, but insure it's at least
         // one more than current charge.
-        int next_charge_level = ( ( charge_level + 1 ) * p->ammo_capacity() ) / 100;
+        int next_charge_level = ( ( charge_level + 1 ) * p->ammo_capacity( ammotype( "battery" ) ) ) / 100;
         next_charge_level = std::max( next_charge_level, p->ammo_remaining() + 1 );
         int qty = std::min( amount, next_charge_level - p->ammo_remaining() );
         p->ammo_set( fuel_type_battery, p->ammo_remaining() + qty );
         amount -= qty;
-        if( p->ammo_capacity() > p->ammo_remaining() ) {
-            chargeable_parts.insert( { ( p->ammo_remaining() * 100 ) / p->ammo_capacity(), p } );
+        if( p->ammo_capacity( ammotype( "battery" ) ) > p->ammo_remaining() ) {
+            chargeable_parts.insert( { ( p->ammo_remaining() * 100 ) / p->ammo_capacity( ammotype( "battery" ) ), p } );
         }
     }
 
@@ -4915,7 +4946,7 @@ int vehicle::discharge_battery( int amount, bool recurse )
     std::multimap<int, vehicle_part *> dischargeable_parts;
     for( vehicle_part &p : parts ) {
         if( p.is_available() && p.is_battery() && p.ammo_remaining() > 0 ) {
-            dischargeable_parts.insert( { ( p.ammo_remaining() * 100 ) / p.ammo_capacity(), &p } );
+            dischargeable_parts.insert( { ( p.ammo_remaining() * 100 ) / p.ammo_capacity( ammotype( "battery" ) ), &p } );
         }
     }
     while( amount > 0 && !dischargeable_parts.empty() ) {
@@ -4925,12 +4956,12 @@ int vehicle::discharge_battery( int amount, bool recurse )
         vehicle_part *p = iter->second;
         dischargeable_parts.erase( iter );
         // Calculate number of charges to reach the previous %.
-        int prev_charge_level = ( ( charge_level - 1 ) * p->ammo_capacity() ) / 100;
+        int prev_charge_level = ( ( charge_level - 1 ) * p->ammo_capacity( ammotype( "battery" ) ) ) / 100;
         int amount_to_discharge = std::min( p->ammo_remaining() - prev_charge_level, amount );
         p->ammo_consume( amount_to_discharge, global_part_pos3( *p ) );
         amount -= amount_to_discharge;
         if( p->ammo_remaining() > 0 ) {
-            dischargeable_parts.insert( { ( p->ammo_remaining() * 100 ) / p->ammo_capacity(), p } );
+            dischargeable_parts.insert( { ( p->ammo_remaining() * 100 ) / p->ammo_capacity( ammotype( "battery" ) ), p } );
         }
     }
 
@@ -5223,7 +5254,7 @@ void vehicle::place_spawn_items()
         return;
     }
 
-    for( const auto &pt : type->parts ) {
+    for( const vehicle_prototype::part_def &pt : type->parts ) {
         if( pt.with_ammo ) {
             int turret = part_with_feature( pt.pos, "TURRET", true );
             if( turret >= 0 && x_in_y( pt.with_ammo, 100 ) ) {
@@ -5270,9 +5301,12 @@ void vehicle::place_spawn_items()
                                           !e.magazine_current();
 
                         if( spawn_mag ) {
-                            e.put_in( item( e.magazine_default(), e.birthday() ), item_pocket::pocket_type::MAGAZINE );
-                        }
-                        if( spawn_ammo ) {
+                            item mag( e.magazine_default(), e.birthday() );
+                            if( spawn_ammo ) {
+                                mag.ammo_set( mag.ammo_default() );
+                            }
+                            e.put_in( mag, item_pocket::pocket_type::MAGAZINE_WELL );
+                        } else if( spawn_ammo && e.is_magazine() ) {
                             e.ammo_set( e.ammo_default() );
                         }
                     }
@@ -5489,7 +5523,7 @@ void vehicle::refresh()
         if( vpi.has_flag( VPFLAG_SOLAR_PANEL ) ) {
             solar_panels.push_back( p );
         }
-        if( vpi.has_flag( VPFLAG_ROTOR ) ) {
+        if( vpi.has_flag( VPFLAG_ROTOR ) || vpi.has_flag( VPFLAG_ROTOR_SIMPLE ) ) {
             rotors.push_back( p );
         }
         if( vpi.has_flag( "WIND_TURBINE" ) ) {
@@ -6455,7 +6489,7 @@ std::map<itype_id, int> vehicle::fuels_left() const
 {
     std::map<itype_id, int> result;
     for( const auto &p : parts ) {
-        if( p.is_fuel_store() && p.ammo_current() != "null" ) {
+        if( p.is_fuel_store() && !p.ammo_current().is_null() ) {
             result[ p.ammo_current() ] += p.ammo_remaining();
         }
     }
@@ -6659,15 +6693,15 @@ void vehicle::update_time( const time_point &update_to )
         double area = std::pow( pt.info().size / units::legacy_volume_factor, 2 ) * M_PI;
         int qty = roll_remainder( funnel_charges_per_turn( area, accum_weather.rain_amount ) );
         int c_qty = qty + ( tank->can_reload( water_clean ) ?  tank->ammo_remaining() : 0 );
-        int cost_to_purify = c_qty * item::find_type( "water_purifier" )->charges_to_use();
+        int cost_to_purify = c_qty * item::find_type( itype_water_purifier )->charges_to_use();
 
         if( qty > 0 ) {
             if( has_part( global_part_pos3( pt ), "WATER_PURIFIER", true ) &&
-                ( fuel_left( "battery", true ) > cost_to_purify ) ) {
-                tank->ammo_set( "water_clean", c_qty );
+                ( fuel_left( itype_battery, true ) > cost_to_purify ) ) {
+                tank->ammo_set( itype_water_clean, c_qty );
                 discharge_battery( cost_to_purify );
             } else {
-                tank->ammo_set( "water", tank->ammo_remaining() + qty );
+                tank->ammo_set( itype_water, tank->ammo_remaining() + qty );
             }
             invalidate_mass();
         }

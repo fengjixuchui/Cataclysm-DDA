@@ -120,7 +120,7 @@ void player::print_encumbrance( const catacurses::window &win, const int line,
         const bool combine = bps[thisline].second;
         const encumbrance_data &e = enc_data[bp];
         const bool highlighted = selected_clothing ? selected_clothing->covers( bp ) : false;
-        std::string out = body_part_name_as_heading( bp, combine ? 2 : 1 );
+        std::string out = body_part_name_as_heading( convert_bp( bp ).id(), combine ? 2 : 1 );
         if( utf8_width( out ) > 7 ) {
             out = utf8_truncate( out, 7 );
         }
@@ -162,7 +162,7 @@ static std::string swim_cost_text( int moves )
 
 static std::string run_cost_text( int moves )
 {
-    return string_format( _( "Running movement point cost: <color_white>%+d</color>\n" ), moves );
+    return string_format( _( "Movement point cost: <color_white>%+d</color>\n" ), moves );
 }
 
 static std::string reload_cost_text( int moves )

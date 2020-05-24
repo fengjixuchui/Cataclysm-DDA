@@ -278,7 +278,6 @@ class Character : public Creature, public visitable<Character>
         bool in_species( const species_id &spec ) const override;
         // Turned to false for simulating NPCs on distant missions so they don't drop all their gear in sight
         bool death_drops;
-        const std::string &symbol() const override;
 
         enum class comfort_level {
             impossible = -999,
@@ -1566,8 +1565,9 @@ class Character : public Creature, public visitable<Character>
          */
         social_modifiers get_mutation_social_mods() const;
 
-        /** Color's character's tile's background */
+        // Display
         nc_color symbol_color() const override;
+        const std::string &symbol() const override;
 
         std::string extended_description() const override;
 
@@ -1895,7 +1895,7 @@ class Character : public Creature, public visitable<Character>
          * As above, but includes all creatures the player can detect well enough to target
          * with ranged weapons, e.g. with infrared vision.
          */
-        std::vector<Creature *> get_targetable_creatures( int range ) const;
+        std::vector<Creature *> get_targetable_creatures( int range, bool melee ) const;
         /** Returns an enumeration of visible mutations with colors */
         std::string visible_mutations( int visibility_cap ) const;
         player_activity get_destination_activity() const;
@@ -2103,7 +2103,6 @@ class Character : public Creature, public visitable<Character>
         int heartrate_bpm() const;
         std::vector<std::string> short_description_parts() const;
         std::string short_description() const;
-        int print_info( const catacurses::window &w, int vStart, int vLines, int column ) const override;
         // Checks whether a player can hear a sound at a given volume and location.
         bool can_hear( const tripoint &source, int volume ) const;
         // Returns a multiplier indicating the keenness of a player's hearing.
@@ -2190,8 +2189,9 @@ class Character : public Creature, public visitable<Character>
         float activity_level = NO_EXERCISE;
 
         trap_map known_traps;
-        std::array<encumbrance_data, num_bp> encumbrance_cache;
         mutable std::map<std::string, double> cached_info;
+        mutable std::array<encumbrance_data, num_bp> encumbrance_cache;
+        mutable bool encumbrance_cache_dirty = true;
         bool bio_soporific_powered_at_last_sleep_check;
         /** last time we checked for sleep */
         time_point last_sleep_check = calendar::turn_zero;
