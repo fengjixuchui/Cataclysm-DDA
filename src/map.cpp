@@ -5556,8 +5556,6 @@ bool map::apply_vision_effects( const catacurses::window &w, const visibility_ty
         case VIS_DARK:
         // can't see this square at all
         case VIS_HIDDEN:
-            symbol = ' ';
-            color = c_black;
             break;
     }
     wputch( w, color, symbol );
@@ -7333,6 +7331,13 @@ void map::spawn_monsters_submap( const tripoint &gp, bool ignore_sight )
             }
             if( i.friendly ) {
                 tmp.friendly = -1;
+            }
+            if( !i.data.ammo.empty() ) {
+                for( std::pair<std::string, jmapgen_int> ap : i.data.ammo ) {
+                    tmp.ammo.emplace( ap.first, ap.second.get() );
+                }
+            } else {
+                tmp.ammo = tmp.type->starting_ammo;
             }
 
             const auto valid_location = [&]( const tripoint & p ) {

@@ -152,7 +152,6 @@ static const trait_id trait_LIGHTWEIGHT( "LIGHTWEIGHT" );
 static const trait_id trait_SAPROVORE( "SAPROVORE" );
 static const trait_id trait_SMALL_OK( "SMALL_OK" );
 static const trait_id trait_SMALL2( "SMALL2" );
-static const trait_id trait_SQUEAMISH( "SQUEAMISH" );
 static const trait_id trait_TOLERANCE( "TOLERANCE" );
 static const trait_id trait_WOOLALLERGY( "WOOLALLERGY" );
 
@@ -163,7 +162,6 @@ static const std::string flag_BIPOD( "BIPOD" );
 static const std::string flag_BYPRODUCT( "BYPRODUCT" );
 static const std::string flag_CABLE_SPOOL( "CABLE_SPOOL" );
 static const std::string flag_CANNIBALISM( "CANNIBALISM" );
-static const std::string flag_CASING( "CASING" );
 static const std::string flag_CHARGEDIM( "CHARGEDIM" );
 static const std::string flag_COLD( "COLD" );
 static const std::string flag_COLLAPSIBLE_STOCK( "COLLAPSIBLE_STOCK" );
@@ -204,8 +202,6 @@ static const std::string flag_LIQUID( "LIQUID" );
 static const std::string flag_LIQUIDCONT( "LIQUIDCONT" );
 static const std::string flag_LITCIG( "LITCIG" );
 static const std::string flag_MAG_BELT( "MAG_BELT" );
-static const std::string flag_MAG_DESTROY( "MAG_DESTROY" );
-static const std::string flag_MAG_EJECT( "MAG_EJECT" );
 static const std::string flag_MELTS( "MELTS" );
 static const std::string flag_MUSHY( "MUSHY" );
 static const std::string flag_NANOFAB_TEMPLATE( "NANOFAB_TEMPLATE" );
@@ -1498,22 +1494,11 @@ void item::basic_info( std::vector<iteminfo> &info, const iteminfo_query *parts,
         }
     }
     if( parts->test( iteminfo_parts::BASE_VOLUME ) ) {
-        int converted_volume_scale = 0;
-        const double converted_volume = round_up( convert_volume( volume().value(),
-                                        &converted_volume_scale ) * batch, 3 );
-        iteminfo::flags f = iteminfo::lower_is_better | iteminfo::no_newline;
-        if( converted_volume_scale != 0 ) {
-            f |= iteminfo::is_three_decimal;
-        }
-        info.push_back( iteminfo( "BASE", _( "Volume: " ),
-                                  string_format( "<num> %s", volume_units_abbr() ),
-                                  f, converted_volume ) );
+        info.push_back( vol_to_info( "BASE", _( "Volume: " ), volume() * batch, 3 ) );
     }
     if( parts->test( iteminfo_parts::BASE_WEIGHT ) ) {
-        info.push_back( iteminfo( "BASE", space + _( "Weight: " ),
-                                  string_format( "<num> %s", weight_units() ),
-                                  iteminfo::lower_is_better | iteminfo::is_decimal,
-                                  convert_weight( weight() ) * batch ) );
+        info.push_back( weight_to_info( "BASE", space + _( "Weight: " ), weight() * batch ) );
+        info.back().bNewLine = true;
     }
     if( parts->test( iteminfo_parts::BASE_LENGTH ) && length() > 0_mm ) {
         info.push_back( iteminfo( "BASE", _( "Length: " ),
@@ -1717,7 +1702,6 @@ void item::food_info( const item *food_item, std::vector<iteminfo> &info,
         }
     }
 
-    const std::string space = "  ";
     if( max_nutr.kcal != 0 || food_item->get_comestible()->quench != 0 ) {
         if( parts->test( iteminfo_parts::FOOD_NUTRITION ) ) {
             info.push_back( iteminfo( "FOOD", _( "<bold>Calories (kcal)</bold>: " ),
@@ -1728,6 +1712,7 @@ void item::food_info( const item *food_item, std::vector<iteminfo> &info,
             }
         }
         if( parts->test( iteminfo_parts::FOOD_QUENCH ) ) {
+            const std::string space = "  ";
             info.push_back( iteminfo( "FOOD", space + _( "Quench: " ),
                                       food_item->get_comestible()->quench ) );
         }
@@ -1907,7 +1892,6 @@ void item::ammo_info( std::vector<iteminfo> &info, const iteminfo_query *parts, 
         return;
     }
 
-    const std::string space = "  ";
     if( ammo_remaining() > 0 ) {
         info.emplace_back( "AMMO", _( "<bold>Ammunition</bold>: " ),
                            ammo_data()->nname( ammo_remaining() ) );
@@ -1917,6 +1901,7 @@ void item::ammo_info( std::vector<iteminfo> &info, const iteminfo_query *parts, 
 
     const islot_ammo &ammo = *ammo_data()->ammo;
     if( !ammo.damage.empty() || ammo.force_stat_display ) {
+        const std::string space = "  ";
         if( !ammo.damage.empty() && ammo.damage.damage_units.front().amount > 0 ) {
             if( parts->test( iteminfo_parts::AMMO_DAMAGE_VALUE ) ) {
                 info.emplace_back( "AMMO", _( "Damage: " ), "",
@@ -2413,9 +2398,8 @@ void item::armor_protection_info( std::vector<iteminfo> &info, const iteminfo_qu
         return;
     }
 
-    const std::string space = "  ";
-
     if( parts->test( iteminfo_parts::ARMOR_PROTECTION ) ) {
+        const std::string space = "  ";
         info.push_back( iteminfo( "ARMOR", _( "<bold>Protection</bold>: Bash: " ), "",
                                   iteminfo::no_newline, bash_resist() ) );
         info.push_back( iteminfo( "ARMOR", space + _( "Cut: " ), "", iteminfo::no_newline, cut_resist() ) );
@@ -2629,13 +2613,11 @@ void item::animal_armor_info( std::vector<iteminfo> &info, const iteminfo_query 
     if( !is_pet_armor() ) {
         return;
     }
-
-    const std::string space = "  ";
-
     int converted_storage_scale = 0;
     const double converted_storage = round_up( convert_volume( type->pet_armor->storage.value(),
                                      &converted_storage_scale ), 2 );
     if( parts->test( iteminfo_parts::ARMOR_STORAGE ) && converted_storage > 0 ) {
+        const std::string space = "  ";
         const iteminfo::flags f = converted_storage_scale == 0 ? iteminfo::no_flags : iteminfo::is_decimal;
         info.push_back( iteminfo( "ARMOR", space + _( "Storage: " ),
                                   string_format( "<num> %s", volume_units_abbr() ),
@@ -3421,18 +3403,8 @@ void item::contents_info( std::vector<iteminfo> &info, const iteminfo_query *par
 
             if( contents_item->made_of_from_type( LIQUID ) ) {
                 units::volume contents_volume = contents_item->volume() * batch;
-                int converted_volume_scale = 0;
-                const double converted_volume =
-                    round_up( convert_volume( contents_volume.value(),
-                                              &converted_volume_scale ), 2 );
                 info.emplace_back( "DESCRIPTION", contents_item->display_name() );
-                iteminfo::flags f = iteminfo::no_newline;
-                if( converted_volume_scale != 0 ) {
-                    f |= iteminfo::is_decimal;
-                }
-                info.emplace_back( "CONTAINER", description + space,
-                                   string_format( "<num> %s", volume_units_abbr() ), f,
-                                   converted_volume );
+                info.emplace_back( vol_to_info( "CONTAINER", description + space, contents_volume ) );
             } else {
                 info.emplace_back( "DESCRIPTION", contents_item->display_name() );
                 info.emplace_back( "DESCRIPTION", description.translated() );
@@ -3447,8 +3419,6 @@ void item::final_info( std::vector<iteminfo> &info, const iteminfo_query *parts,
     if( is_null() ) {
         return;
     }
-
-    const std::string space = "  ";
 
     insert_separation_line( info );
 
@@ -3680,12 +3650,12 @@ void item::final_info( std::vector<iteminfo> &info, const iteminfo_query *parts,
     }
 
     std::map<std::string, std::string>::const_iterator item_note = item_vars.find( "item_note" );
-    std::map<std::string, std::string>::const_iterator item_note_tool =
-        item_vars.find( "item_note_tool" );
 
     if( item_note != item_vars.end() && parts->test( iteminfo_parts::DESCRIPTION_NOTES ) ) {
         insert_separation_line( info );
         std::string ntext;
+        std::map<std::string, std::string>::const_iterator item_note_tool =
+            item_vars.find( "item_note_tool" );
         const use_function *use_func =
             item_note_tool != item_vars.end() ?
             item_controller->find_template(
@@ -3722,6 +3692,7 @@ void item::final_info( std::vector<iteminfo> &info, const iteminfo_query *parts,
                                   static_cast<double>( price_preapoc ) / 100 ) );
     }
     if( price_preapoc != price_postapoc && parts->test( iteminfo_parts::BASE_BARTER ) ) {
+        const std::string space = "  ";
         info.push_back( iteminfo( "BASE", space + _( "Barter value: " ), _( "$<num>" ),
                                   iteminfo::is_decimal | iteminfo::lower_is_better,
                                   static_cast<double>( price_postapoc ) / 100 ) );
@@ -5656,13 +5627,12 @@ int item::bash_resist( bool to_self ) const
 
     float resist = 0;
     float mod = get_clothing_mod_val( clothing_mod_type_bash );
-    int eff_thickness = 1;
 
     // base resistance
     // Don't give reinforced items +armor, just more resistance to ripping
     const int dmg = damage_level( 4 );
     const int eff_damage = to_self ? std::min( dmg, 0 ) : std::max( dmg, 0 );
-    eff_thickness = std::max( 1, get_thickness() - eff_damage );
+    const int eff_thickness = std::max( 1, get_thickness() - eff_damage );
 
     const std::vector<const material_type *> mat_types = made_of_types();
     if( !mat_types.empty() ) {
@@ -5685,13 +5655,12 @@ int item::cut_resist( bool to_self ) const
     const int base_thickness = get_thickness();
     float resist = 0;
     float mod = get_clothing_mod_val( clothing_mod_type_cut );
-    int eff_thickness = 1;
 
     // base resistance
     // Don't give reinforced items +armor, just more resistance to ripping
     const int dmg = damage_level( 4 );
     const int eff_damage = to_self ? std::min( dmg, 0 ) : std::max( dmg, 0 );
-    eff_thickness = std::max( 1, base_thickness - eff_damage );
+    const int eff_thickness = std::max( 1, base_thickness - eff_damage );
 
     const std::vector<const material_type *> mat_types = made_of_types();
     if( !mat_types.empty() ) {
@@ -5724,13 +5693,12 @@ int item::bullet_resist( bool to_self ) const
     const int base_thickness = get_thickness();
     float resist = 0;
     float mod = get_clothing_mod_val( clothing_mod_type_bullet );
-    int eff_thickness = 1;
 
     // base resistance
     // Don't give reinforced items +armor, just more resistance to ripping
     const int dmg = damage_level( 4 );
     const int eff_damage = to_self ? std::min( dmg, 0 ) : std::max( dmg, 0 );
-    eff_thickness = std::max( 1, base_thickness - eff_damage );
+    const int eff_thickness = std::max( 1, base_thickness - eff_damage );
 
     const std::vector<const material_type *> mat_types = made_of_types();
     if( !mat_types.empty() ) {
@@ -6328,7 +6296,6 @@ bool item::is_ammo_container() const
     }, item_pocket::pocket_type::CONTAINER );
 }
 
-
 bool item::is_melee() const
 {
     for( int idx = DT_NULL + 1; idx != NUM_DT; ++idx ) {
@@ -6496,27 +6463,29 @@ bool item::is_reloadable_with( const itype_id &ammo ) const
 
 bool item::is_reloadable_helper( const itype_id &ammo, bool now ) const
 {
-    // empty ammo is passed for listing possible ammo apparently, so it needs to return true.
     if( !is_reloadable() ) {
         return false;
-    } else if( magazine_integral() ) {
-        if( !ammo.is_empty() ) {
-            if( ammo_data() ) {
-                if( ammo_current() != ammo ) {
-                    return false;
-                }
-            } else {
-                const itype *at = find_type( ammo );
-                if( ( !at->ammo || !ammo_types().count( at->ammo->type ) ) &&
-                    !magazine_compatible().count( ammo ) ) {
-                    return false;
-                }
+    }
+
+    // empty ammo is passed for listing possible ammo, so it needs to return true.
+    if( ammo.is_empty() ) {
+        return true;
+    }
+
+    if( magazine_integral() ) {
+        if( ammo_data() ) {
+            if( ammo_current() != ammo ) {
+                return false;
+            }
+        } else {
+            if( ( !ammo->ammo || !ammo_types().count( ammo->ammo->type ) ) &&
+                !magazine_compatible().count( ammo ) ) {
+                return false;
             }
         }
-        return now ? ( ammo_remaining() < ammo_capacity( find_type( ammo )->ammo->type ) ) : true;
-    } else {
-        return ammo.is_empty() ? true : magazine_compatible().count( ammo );
+        return now ? ammo_remaining() < ammo_capacity( ammo->ammo->type ) : true;
     }
+    return magazine_compatible().count( ammo );
 }
 
 bool item::is_salvageable() const
@@ -8352,13 +8321,12 @@ iteminfo::iteminfo( const std::string &Type, const std::string &Name, double Val
 }
 
 iteminfo vol_to_info( const std::string &type, const std::string &left,
-                      const units::volume &vol )
+                      const units::volume &vol, int decimal_places )
 {
     iteminfo::flags f = iteminfo::lower_is_better | iteminfo::no_newline;
     int converted_volume_scale = 0;
     const double converted_volume =
-        convert_volume( vol.value(),
-                        &converted_volume_scale );
+        round_up( convert_volume( vol.value(), &converted_volume_scale ), decimal_places );
     if( converted_volume_scale != 0 ) {
         f |= iteminfo::is_decimal;
     }
@@ -8367,12 +8335,12 @@ iteminfo vol_to_info( const std::string &type, const std::string &left,
 }
 
 iteminfo weight_to_info( const std::string &type, const std::string &left,
-                         const units::mass &weight )
+                         const units::mass &weight, int /* decimal_places */ )
 {
     iteminfo::flags f = iteminfo::lower_is_better | iteminfo::no_newline;
     const double converted_weight = convert_weight( weight );
     f |= iteminfo::is_decimal;
-    return iteminfo( type, left, string_format( "<num> %s", volume_units_abbr() ), f,
+    return iteminfo( type, left, string_format( "<num> %s", weight_units() ), f,
                      converted_weight );
 }
 
@@ -9407,7 +9375,8 @@ bool item::process_blackpowder_fouling( player *carrier )
 bool item::process( player *carrier, const tripoint &pos, bool activate, float insulation,
                     temperature_flag flag, float spoil_multiplier_parent )
 {
-    contents.process( carrier, pos, activate, insulation, flag, spoil_multiplier_parent );
+    contents.process( carrier, pos, activate, type->insulation_factor * insulation, flag,
+                      spoil_multiplier_parent );
     return process_internal( carrier, pos, activate, insulation, flag, spoil_multiplier_parent );
 }
 

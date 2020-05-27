@@ -580,7 +580,7 @@ class Character : public Creature, public visitable<Character>
                          int intensity = 0, bool force = false, bool deferred = false ) override;
 
         /**Determine if character is susceptible to dis_type and if so apply the symptoms*/
-        void expose_to_disease( diseasetype_id dis_type );
+        void expose_to_disease( const diseasetype_id &dis_type );
         /**
          * Handles end-of-turn processing.
          */
@@ -688,6 +688,8 @@ class Character : public Creature, public visitable<Character>
         void roll_cut_damage( bool crit, damage_instance &di, bool average, const item &weap ) const;
         /** Adds player's total stab damage to the damage instance */
         void roll_stab_damage( bool crit, damage_instance &di, bool average, const item &weap ) const;
+        /** Adds player's total non-bash, non-cut, non-stab damage to the damage instance */
+        void roll_other_damage( bool crit, damage_instance &di, bool average, const item &weap ) const;
 
     private:
         /** Check if an area-of-effect technique has valid targets */
@@ -1052,8 +1054,8 @@ class Character : public Creature, public visitable<Character>
         bool has_enough_anesth( const itype &cbm );
         void consume_anesth_requirment( const itype &cbm, player &patient );
         /**Has the required equipement for manual installation*/
-        bool has_installation_requirment( bionic_id bid );
-        void consume_installation_requirment( bionic_id bid );
+        bool has_installation_requirment( const bionic_id &bid );
+        void consume_installation_requirment( const bionic_id &bid );
         /** Handles process of introducing patient into anesthesia during Autodoc operations. Requires anesthesia kits or NOPAIN mutation */
         void introduce_into_anesthesia( const time_duration &duration, player &installer,
                                         bool needs_anesthesia );
@@ -1227,6 +1229,8 @@ class Character : public Creature, public visitable<Character>
         // returns a list of all item_location the character has, including items contained in other items.
         // only for CONTAINER pocket type; does not look for magazines
         std::vector<item_location> all_items_loc();
+        // Returns list of all the top level item_lodation the character has. Includes worn and held items.
+        std::vector<item_location> top_items_loc();
         /** Return the item pointer of the item with given invlet, return nullptr if
          * the player does not have such an item with that invlet. Don't use this on npcs.
          * Only use the invlet in the user interface, otherwise always use the item position. */
