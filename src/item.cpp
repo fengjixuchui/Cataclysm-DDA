@@ -138,7 +138,7 @@ static const skill_id skill_weapon( "weapon" );
 
 static const quality_id qual_JACK( "JACK" );
 static const quality_id qual_LIFT( "LIFT" );
-static const species_id ROBOT( "ROBOT" );
+static const species_id species_ROBOT( "ROBOT" );
 
 static const std::string trait_flag_CANNIBAL( "CANNIBAL" );
 
@@ -263,7 +263,7 @@ static const std::string flag_WATER_EXTINGUISH( "WATER_EXTINGUISH" );
 static const std::string flag_WET( "WET" );
 static const std::string flag_WIND_EXTINGUISH( "WIND_EXTINGUISH" );
 
-static const matec_id rapid_strike( "RAPID" );
+static const matec_id RAPID( "RAPID" );
 
 class npc_class;
 
@@ -1401,7 +1401,7 @@ double item::effective_dps( const player &guy, monster &mon ) const
         subtotal_damage = damage_per_hit * num_strikes;
         double subtotal_moves = moves_per_attack * num_strikes;
 
-        if( has_technique( rapid_strike ) ) {
+        if( has_technique( RAPID ) ) {
             monster temp_rs_mon = mon;
             damage_instance rs_base_damage;
             guy.roll_all_damage( crit, rs_base_damage, true, *this );
@@ -2979,10 +2979,17 @@ void item::tool_info( std::vector<iteminfo> &info, const iteminfo_query *parts, 
     } else if( !ammo_types().empty() && parts->test( iteminfo_parts::TOOL_CAPACITY ) ) {
         if( !ammo_types().empty() ) {
             for( const ammotype &at : ammo_types() ) {
-                info.emplace_back( "TOOL", string_format(
-                                       //~ "%s" is ammunition type. This types can't be plural.
-                                       ngettext( "Maximum <num> charge of %s.", "Maximum <num> charges of %s.",
-                                                 ammo_capacity( at ) ), at->name() ) );
+                info.emplace_back(
+                    "TOOL",
+                    "",
+                    string_format(
+                        ngettext(
+                            "Maximum <num> charge of %s.",
+                            "Maximum <num> charges of %s.",
+                            ammo_capacity( at ) ),
+                        at->name() ),
+                    iteminfo::no_flags,
+                    ammo_capacity( at ) );
             }
 
             // No need to display max charges, since charges are always equal to bionic power
@@ -4616,7 +4623,7 @@ int item::price( bool practical ) const
             // items with integral magazines may contain ammunition which can affect the price
             child += item( e->ammo_data(), calendar::turn, e->charges ).price( practical );
 
-        } else if( e->is_tool() ) {
+        } else if( e->is_tool() && e->type->tool->max_charges != 0 ) {
             // if tool has no ammo (e.g. spray can) reduce price proportional to remaining charges
             child *= e->ammo_remaining() / static_cast<double>( std::max( e->type->charges_default(), 1 ) );
         }
@@ -8982,14 +8989,14 @@ bool item::process_corpse( player *carrier, const tripoint &pos )
     if( rng( 0, volume() / units::legacy_volume_factor ) > burnt && g->revive_corpse( pos, *this ) ) {
         if( carrier == nullptr ) {
             if( g->u.sees( pos ) ) {
-                if( corpse->in_species( ROBOT ) ) {
+                if( corpse->in_species( species_ROBOT ) ) {
                     add_msg( m_warning, _( "A nearby robot has repaired itself and stands up!" ) );
                 } else {
                     add_msg( m_warning, _( "A nearby corpse rises and moves towards you!" ) );
                 }
             }
         } else {
-            if( corpse->in_species( ROBOT ) ) {
+            if( corpse->in_species( species_ROBOT ) ) {
                 carrier->add_msg_if_player( m_warning,
                                             _( "Oh dear god, a robot you're carrying has started moving!" ) );
             } else {
