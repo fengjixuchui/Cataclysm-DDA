@@ -677,6 +677,9 @@ item &item::ammo_unset()
     if( !is_tool() && !is_gun() && !is_magazine() ) {
         // do nothing
     } else if( is_magazine() ) {
+        if( is_money() ) { // charges are set wrong on cash cards.
+            charges = 0;
+        }
         contents.clear_items();
     } else if( magazine_integral() ) {
         curammo = nullptr;
@@ -7883,7 +7886,10 @@ bool item::getlight( float &luminance, int &width, int &direction ) const
 int item::getlight_emit() const
 {
     float lumint = type->light_emission;
-    if( lumint == 0 || ( ammo_required() > 0 && ammo_remaining() == 0 ) ) {
+    if( ammo_required() == 0 ) {
+        return lumint;
+    }
+    if( lumint == 0 || ammo_remaining() == 0 ) {
         return 0;
     }
     if( has_flag( flag_CHARGEDIM ) && is_tool() && !has_flag( flag_USE_UPS ) ) {
@@ -8524,7 +8530,7 @@ uint64_t item::make_component_hash() const
     }
 
     std::string concatenated_ids;
-    for( std::string id : id_set ) {
+    for( const std::string &id : id_set ) {
         concatenated_ids += id;
     }
 
@@ -9627,7 +9633,7 @@ std::string item::type_name( unsigned int quantity ) const
     for( const conditional_name &cname : type->conditional_names ) {
         // Lambda for recursively searching for a item ID among all components.
         std::function<bool ( std::list<item> )> component_id_contains =
-        [&]( std::list<item> components ) {
+        [&]( const std::list<item> &components ) {
             for( const item &component : components ) {
                 if( component.typeId().str().find( cname.condition ) != std::string::npos ||
                     component_id_contains( component.components ) ) {

@@ -130,7 +130,8 @@ static const ter_str_id ter_t_wreckage( "t_wreckage" );
 
 static const trap_str_id tr_brazier( "tr_brazier" );
 
-static const std::array<std::string, NUM_OBJECTS> obj_type_name = { { "OBJECT_NONE", "OBJECT_ITEM", "OBJECT_ACTOR", "OBJECT_PLAYER",
+static const std::array<std::string, static_cast<size_t>( object_type::NUM_OBJECT_TYPES )>
+obj_type_name = { { "OBJECT_NONE", "OBJECT_ITEM", "OBJECT_ACTOR", "OBJECT_PLAYER",
         "OBJECT_NPC", "OBJECT_MONSTER", "OBJECT_VEHICLE", "OBJECT_TRAP", "OBJECT_FIELD",
         "OBJECT_TERRAIN", "OBJECT_FURNITURE"
     }
@@ -633,8 +634,14 @@ void Character::load( const JsonObject &data )
     morale->load( data );
 
     _skills->clear();
-    for( const JsonMember member : data.get_object( "skills" ) ) {
+    JsonObject skill_data = data.get_object( "skills" );
+    for( const JsonMember member : skill_data ) {
         member.read( ( *_skills )[skill_id( member.name() )] );
+    }
+    if( savegame_loading_version <= 28 ) {
+        if( !skill_data.has_member( "chemistry" ) && skill_data.has_member( "cooking" ) ) {
+            skill_data.get_member( "cooking" ).read( ( *_skills )[skill_id( "chemistry" )] );
+        }
     }
 
     on_stat_change( "thirst", thirst );
@@ -1047,7 +1054,7 @@ void avatar::store( JsonOut &json ) const
 
     json.member( "assigned_invlet" );
     json.start_array();
-    for( auto iter : inv.assigned_invlet ) {
+    for( const auto &iter : inv.assigned_invlet ) {
         json.start_array();
         json.write( iter.first );
         json.write( iter.second );
@@ -1086,7 +1093,7 @@ void avatar::load( const JsonObject &data )
     }
     const auto iter = std::find( obj_type_name.begin(), obj_type_name.end(), grab_typestr );
     grab( iter == obj_type_name.end() ?
-          OBJECT_NONE : static_cast<object_type>( std::distance( obj_type_name.begin(), iter ) ),
+          object_type::NONE : static_cast<object_type>( std::distance( obj_type_name.begin(), iter ) ),
           grab_point );
 
     data.read( "focus_pool", focus_pool );
@@ -2994,7 +3001,7 @@ void Creature::store( JsonOut &jsout ) const
 
     // Because JSON requires string keys we need to convert our int keys
     std::unordered_map<std::string, std::unordered_map<std::string, effect>> tmp_map;
-    for( auto maps : *effects ) {
+    for( const auto &maps : *effects ) {
         for( const auto i : maps.second ) {
             std::ostringstream convert;
             convert << i.first;
@@ -3049,18 +3056,18 @@ void Creature::load( const JsonObject &jsin )
             std::unordered_map<std::string, std::unordered_map<std::string, effect>> tmp_map;
             jsin.read( "effects", tmp_map );
             int key_num = 0;
-            for( auto maps : tmp_map ) {
+            for( const auto &maps : tmp_map ) {
                 const efftype_id id( maps.first );
                 if( !id.is_valid() ) {
                     debugmsg( "Invalid effect: %s", id.c_str() );
                     continue;
                 }
-                for( auto i : maps.second ) {
+                for( const auto &i : maps.second ) {
                     if( !( std::istringstream( i.first ) >> key_num ) ) {
                         key_num = 0;
                     }
                     const body_part bp = static_cast<body_part>( key_num );
-                    effect &e = i.second;
+                    const effect &e = i.second;
 
                     ( *effects )[id][bp] = e;
                     on_effect_int_change( id, e.get_intensity(), bp );
