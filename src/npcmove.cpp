@@ -4529,7 +4529,7 @@ bool npc::adjust_worn()
     const auto covers_broken = [this]( const item & it, side s ) {
         const auto covered = it.get_covered_body_parts( s );
         for( size_t i = 0; i < num_hp_parts; i++ ) {
-            if( hp_cur[ i ] <= 0 && covered.test( hp_to_bp( static_cast<hp_part>( i ) ) ) ) {
+            if( hp_cur[ i ] <= 0 && covered.test( convert_bp( hp_to_bp( static_cast<hp_part>( i ) ) ) ) ) {
                 return true;
             }
         }
@@ -4553,7 +4553,7 @@ bool npc::adjust_worn()
     return false;
 }
 
-void npc::set_movement_mode( character_movemode new_mode )
+void npc::set_movement_mode( const move_mode_id &new_mode )
 {
     move_mode = new_mode;
 }
