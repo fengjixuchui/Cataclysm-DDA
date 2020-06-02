@@ -179,6 +179,19 @@ enum sleep_deprivation_levels {
     SLEEP_DEPRIVATION_MASSIVE = 14 * 24 * 60
 };
 
+enum class blood_type {
+    blood_O,
+    blood_A,
+    blood_B,
+    blood_AB,
+    num_bt
+};
+
+template<>
+struct enum_traits<blood_type> {
+    static constexpr auto last = blood_type::num_bt;
+};
+
 // This tries to represent both rating and
 // character's decision to respect said rating
 enum edible_rating {
@@ -447,7 +460,7 @@ class Character : public Creature, public visitable<Character>
         int get_fat_to_hp() const;
 
         /** Get size class of character **/
-        m_size get_size() const override;
+        creature_size get_size() const override;
 
         /** Returns either "you" or the player's name. capitalize_first assumes
             that the character's name is already upper case and uses it only for
@@ -1684,6 +1697,10 @@ class Character : public Creature, public visitable<Character>
         int tank_plut;
         int reactor_plut;
         int slow_rad;
+        blood_type my_blood_type;
+        bool blood_rh_factor;
+        // Randomizes characters' blood type and Rh
+        void randomize_blood();
 
         int focus_pool;
         int cash;
@@ -2240,7 +2257,7 @@ class Character : public Creature, public visitable<Character>
         /**height at character creation*/
         int init_height = 175;
         /** Size class of character. */
-        m_size size_class = MS_MEDIUM;
+        creature_size size_class = creature_size::medium;
 
         // the player's activity level for metabolism calculations
         float activity_level = NO_EXERCISE;
@@ -2385,7 +2402,7 @@ class Character : public Creature, public visitable<Character>
 };
 
 // Little size helper, exposed for use in deserialization code.
-m_size calculate_size( const Character &c );
+creature_size calculate_size( const Character &c );
 
 template<>
 struct enum_traits<Character::stat> {
