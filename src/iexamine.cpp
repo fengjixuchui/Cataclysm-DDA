@@ -411,7 +411,6 @@ class atm_menu
                 if( !u.activity.is_null() ) {
                     break;
                 }
-                g->draw();
             }
         }
     private:
@@ -765,7 +764,7 @@ void iexamine::vending( player &p, const tripoint &examp )
         }
 
         draw_scrollbar( w, cur_pos, list_lines, num_items, point( 0, first_item_offset ) );
-        wrefresh( w );
+        wnoutrefresh( w );
 
         // Item info
         auto &cur_items = item_list[static_cast<size_t>( cur_pos )]->second;
@@ -783,7 +782,7 @@ void iexamine::vending( player &p, const tripoint &examp )
         const std::string name = utf8_truncate( cur_item->display_name(),
                                                 static_cast<size_t>( w_info_w - 4 ) );
         mvwprintw( w_item_info, point_east, "<%s>", name );
-        wrefresh( w_item_info );
+        wnoutrefresh( w_item_info );
     } );
 
     for( ;; ) {
@@ -1412,8 +1411,8 @@ void iexamine::locked_object( player &p, const tripoint &examp )
 void iexamine::locked_object_pickable( player &p, const tripoint &examp )
 {
     std::vector<item *> picklocks = p.items_with( [&p]( const item & it ) {
-        // Don't search for worn items such as hairpins
-        if( p.get_item_position( &it ) >= -1 ) {
+        // Don't include worn items such as hairpins
+        if( !p.is_worn( it ) ) {
             return it.type->get_use( "picklock" ) != nullptr;
         }
         return false;
