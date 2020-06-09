@@ -598,6 +598,7 @@
     "price": 0,
     "price_postapoc": 10,
     "material": "bone",
+    "milling": { "into": "meal_bone", "conversion_rate": 4 },
     "volume": "250 ml",
     "vitamins": [ [ "calcium", 96 ] ]
   },
@@ -866,7 +867,7 @@
     "price": 330,
     "price_postapoc": 20,
     "material": "flesh",
-    "flags": "TRADER_AVOID",
+    "flags": [ "TRADER_AVOID" ],
     "stack_size": 1,
     "fun": -12
   },
