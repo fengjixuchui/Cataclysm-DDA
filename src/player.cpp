@@ -217,9 +217,9 @@ stat_mod player::get_pain_penalty() const
     }
 
     if( !has_trait( trait_INT_SLIME ) ) {
-        ret.intelligence = 1 + stat_penalty;
+        ret.intelligence = stat_penalty;
     } else {
-        ret.intelligence = 1 + pain / 5;
+        ret.intelligence = pain / 5;
     }
 
     ret.perception = stat_penalty * 2 / 3;
@@ -3809,8 +3809,7 @@ bool player::has_magazine_for_ammo( const ammotype &at ) const
     } );
 }
 
-// mytest return weapon name to display in sidebar
-std::string player::weapname( unsigned int truncate ) const
+std::string player::weapname() const
 {
     if( weapon.is_gun() ) {
         std::string gunmode;
@@ -3830,14 +3829,13 @@ std::string player::weapname( unsigned int truncate ) const
             }
         }
 
-        return utf8_truncate( string_format( "%s%s%s",
-                                             gunmode, weapon.display_name(), mag_ammo ), truncate );
+        return string_format( "%s%s%s", gunmode, weapon.display_name(), mag_ammo );
 
     } else if( !is_armed() ) {
         return _( "fists" );
 
     } else {
-        return weapon.tname( 1, true, truncate );
+        return weapon.tname();
     }
 }
 

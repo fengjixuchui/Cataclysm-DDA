@@ -312,6 +312,14 @@ inline social_modifiers operator+( social_modifiers lhs, const social_modifiers 
     return lhs;
 }
 
+enum class character_stat : char {
+    STRENGTH,
+    DEXTERITY,
+    INTELLIGENCE,
+    PERCEPTION,
+    DUMMY_STAT
+};
+
 class Character : public Creature, public visitable<Character>
 {
     public:
@@ -345,14 +353,6 @@ class Character : public Creature, public visitable<Character>
             slightly_comfortable = 3,
             comfortable = 5,
             very_comfortable = 10
-        };
-
-        enum stat {
-            STRENGTH,
-            DEXTERITY,
-            INTELLIGENCE,
-            PERCEPTION,
-            DUMMY_STAT
         };
 
         // Character stats
@@ -840,6 +840,8 @@ class Character : public Creature, public visitable<Character>
         /**Unset switched mutation and set target mutation instead*/
         void switch_mutations( const trait_id &switched, const trait_id &target, bool start_powered );
 
+        bool can_power_mutation( const trait_id &mut );
+
         /**Trigger reflex activation if the mutation has one*/
         void mutation_reflex_trigger( const trait_id &mut );
 
@@ -1012,6 +1014,8 @@ class Character : public Creature, public visitable<Character>
 
         /** Returns the to hit bonus from martial arts buffs */
         float mabuff_tohit_bonus() const;
+        /** Returns the critical hit chance bonus from martial arts buffs */
+        float mabuff_critical_hit_chance_bonus() const;
         /** Returns the dodge bonus from martial arts buffs */
         float mabuff_dodge_bonus() const;
         /** Returns the blocking effectiveness bonus from martial arts buffs */
@@ -1113,7 +1117,7 @@ class Character : public Creature, public visitable<Character>
         /**Updates which bionic contain fuel and which is empty*/
         void update_fuel_storage( const itype_id &fuel );
         /**Get stat bonus from bionic*/
-        int get_mod_stat_from_bionic( const Character::stat &Stat ) const;
+        int get_mod_stat_from_bionic( const character_stat &Stat ) const;
         // route for overmap-scale traveling
         std::vector<tripoint> omt_path;
 
@@ -2432,13 +2436,15 @@ class Character : public Creature, public visitable<Character>
         bool last_climate_control_ret;
 };
 
+Character &get_player_character();
+
 // Little size helper, exposed for use in deserialization code.
 creature_size calculate_size( const Character &c );
 
 template<>
-struct enum_traits<Character::stat> {
-    static constexpr Character::stat last = Character::stat::DUMMY_STAT;
+struct enum_traits<character_stat> {
+    static constexpr character_stat last = character_stat::DUMMY_STAT;
 };
 /**Get translated name of a stat*/
-std::string get_stat_name( Character::stat Stat );
+std::string get_stat_name( character_stat Stat );
 #endif // CATA_SRC_CHARACTER_H
