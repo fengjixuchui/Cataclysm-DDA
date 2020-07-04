@@ -792,7 +792,7 @@ static void smash()
 
             if( !u.has_weapon() && hard_target ) {
                 int dam = roll_remainder( 5.0 * ( 1 - glove_coverage / 100.0 ) );
-                if( u.hp_cur[hp_arm_r] > u.hp_cur[hp_arm_l] ) {
+                if( u.get_part_hp_cur( bodypart_id( "arm_r" ) ) > u.get_part_hp_cur( bodypart_id( "arm_l" ) ) ) {
                     u.deal_damage( nullptr, bodypart_id( "hand_r" ), damage_instance( DT_BASH, dam ) );
                 } else {
                     u.deal_damage( nullptr, bodypart_id( "hand_l" ), damage_instance( DT_BASH, dam ) );
@@ -2248,6 +2248,12 @@ bool game::handle_action()
                     mostseen = 0;
                 } else {
                     get_safemode().show();
+                }
+                break;
+
+            case ACTION_WORKOUT:
+                if( query_yn( _( "Start workout?" ) ) ) {
+                    u.assign_activity( player_activity( workout_activity_actor( u.pos() ) ) );
                 }
                 break;
 
