@@ -478,7 +478,7 @@ static std::vector<tripoint> points_for_gas_cloud( const tripoint &center, int r
 {
     map &here = get_map();
     std::vector<tripoint> result;
-    for( const auto &p : closest_tripoints_first( center, radius ) ) {
+    for( const auto &p : closest_points_first( center, radius ) ) {
         if( here.impassable( p ) ) {
             continue;
         }
@@ -3738,8 +3738,8 @@ ret_val<bool> saw_barrel_actor::can_use_on( const player &, const item &, const 
         return ret_val<bool>::make_failure( _( "It's not a gun." ) );
     }
 
-    if( target.type->gun->barrel_length <= 0_ml ) {
-        return ret_val<bool>::make_failure( _( "The barrel is too short." ) );
+    if( target.type->gun->barrel_volume <= 0_ml ) {
+        return ret_val<bool>::make_failure( _( "The barrel is too small." ) );
     }
 
     if( target.gunmod_find( itype_barrel_small ) ) {
