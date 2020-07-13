@@ -70,6 +70,13 @@ const itype &string_id<itype>::obj() const
     return result ? *result : dummy;
 }
 
+/** @relates string_id */
+template<>
+bool string_id<itype>::is_valid() const
+{
+    return item_controller->has_template( *this );
+}
+
 static item_category_id calc_category( const itype &obj );
 static void set_allergy_flags( itype &item_template );
 static void hflesh_to_flesh( itype &item_template );
@@ -1071,9 +1078,13 @@ void Item_factory::check_definitions() const
                 if( item_contents( type->pockets ).bigger_on_the_inside( volume ) ) {
                     msg += "is bigger on the inside.  consider using TARDIS flag.\n";
                 }
-                for( const pocket_data &data : type->pockets ) {
-                    msg += data.check_definition();
-                }
+            }
+        }
+
+        for( const pocket_data &data : type->pockets ) {
+            std::string pocket_error = data.check_definition();
+            if( !pocket_error.empty() ) {
+                msg += "problem with pocket: " + pocket_error;
             }
         }
 
@@ -1897,6 +1908,8 @@ void Item_factory::load( islot_mod &slot, const JsonObject &jo, const std::strin
             slot.magazine_adaptor[ ammo ].insert( itype_id( line ) );
         }
     }
+
+    optional( jo, false, "pocket_mods", slot.add_pockets );
 }
 
 void Item_factory::load_toolmod( const JsonObject &jo, const std::string &src )
