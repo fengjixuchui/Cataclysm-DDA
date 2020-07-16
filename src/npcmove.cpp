@@ -13,6 +13,7 @@
 
 #include "active_item_cache.h"
 #include "activity_handlers.h"
+#include "avatar.h"
 #include "basecamp.h"
 #include "bionics.h"
 #include "bodypart.h"
@@ -68,6 +69,8 @@
 #include "visitable.h"
 #include "vpart_position.h"
 #include "vpart_range.h"
+
+class talker;
 
 static const activity_id ACT_OPERATION( "ACT_OPERATION" );
 static const activity_id ACT_PULP( "ACT_PULP" );
@@ -1235,7 +1238,7 @@ void npc::execute_action( npc_action action )
 
         break;
         case npc_talk_to_player:
-            talk_to_u();
+            g->u.talk_to( get_talker_for( this ) );
             moves = 0;
             break;
 
@@ -3197,7 +3200,7 @@ void npc::drop_items( const units::mass &drop_weight, const units::volume &drop_
         }
         weight_dropped += slice[index]->front().weight();
         volume_dropped += slice[index]->front().volume();
-        item dropped = i_rem( index );
+        item dropped = i_rem( &i_at( index ) );
         num_items_dropped++;
         if( num_items_dropped == 1 ) {
             item_name += dropped.tname();
@@ -3454,7 +3457,7 @@ bool npc::scan_new_items()
     // TODO: Armor?
 }
 
-static void npc_throw( npc &np, item &it, int index, const tripoint &pos )
+static void npc_throw( npc &np, item &it, const tripoint &pos )
 {
     if( get_player_character().sees( np ) ) {
         add_msg( _( "%1$s throws a %2$s." ), np.name, it.tname() );
@@ -3470,7 +3473,7 @@ static void npc_throw( npc &np, item &it, int index, const tripoint &pos )
     }
     // Throw a single charge of a stacking object.
     if( stack_size == -1 || stack_size == 1 ) {
-        np.i_rem( index );
+        np.i_rem( &it );
     } else {
         it.charges = stack_size - 1;
     }
@@ -3535,15 +3538,9 @@ bool npc::alt_attack()
         return false;
     }
 
-    int weapon_index = get_item_position( used );
-    if( weapon_index == INT_MIN ) {
-        debugmsg( "npc::alt_attack() couldn't find expected item %s", used->tname() );
-        return false;
-    }
-
     // Are we going to throw this item?
     if( !used->active && used->has_flag( "NPC_ACTIVATE" ) ) {
-        activate_item( weapon_index );
+        activate_item( *used );
         // Note: intentional lack of return here
         // We want to ignore player-centric rules to avoid carrying live explosives
         // TODO: Non-grenades
@@ -3553,7 +3550,7 @@ bool npc::alt_attack()
     int conf = confident_throw_range( *used, critter );
     const bool wont_hit = wont_hit_friend( tar, *used, true );
     if( dist <= conf && wont_hit ) {
-        npc_throw( *this, *used, weapon_index, tar );
+        npc_throw( *this, *used, tar );
         return true;
     }
 
@@ -3610,14 +3607,13 @@ bool npc::alt_attack()
      * should be equal to the original location of our target, and risking friendly
      * fire is better than holding on to a live grenade / whatever.
      */
-    npc_throw( *this, *used, weapon_index, tar );
+    npc_throw( *this, *used, tar );
     return true;
 }
 
-void npc::activate_item( int item_index )
+void npc::activate_item( item &it )
 {
     const int oldmoves = moves;
-    item &it = i_at( item_index );
     if( it.is_tool() || it.is_food() ) {
         it.type->invoke( *this, it, pos() );
     }
