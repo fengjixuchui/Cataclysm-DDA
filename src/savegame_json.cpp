@@ -50,6 +50,7 @@
 #include "creature_tracker.h"
 #include "damage.h"
 #include "debug.h"
+#include "dialogue_chatbin.h"
 #include "effect.h"
 #include "enum_conversions.h"
 #include "event.h"
@@ -1278,7 +1279,7 @@ void avatar::load( const JsonObject &data )
         // In 0.C there was no player_id member of mission, so it'll be the default -1.
         // When the member was introduced, no steps were taken to ensure compatibility with 0.C, so
         // missions will be buggy for saves between experimental commits bd2088c033 and dd83800.
-        // see npc_chatbin::check_missions and npc::talk_to_u
+        // see dialogue_chatbin::check_missions and npc::talk_to_u
         for( mission *miss : active_missions ) {
             miss->set_player_id_legacy_0c( getID() );
         }
@@ -1406,7 +1407,7 @@ void npc_follower_rules::deserialize( JsonIn &jsin )
     data.read( "pickup_whitelist", *pickup_whitelist );
 }
 
-void npc_chatbin::serialize( JsonOut &json ) const
+void dialogue_chatbin::serialize( JsonOut &json ) const
 {
     json.start_object();
     json.member( "first_topic", first_topic );
@@ -1420,7 +1421,7 @@ void npc_chatbin::serialize( JsonOut &json ) const
     json.end_object();
 }
 
-void npc_chatbin::deserialize( JsonIn &jsin )
+void dialogue_chatbin::deserialize( JsonIn &jsin )
 {
     JsonObject data = jsin.get_object();
 
@@ -2283,7 +2284,6 @@ void item::io( Archive &archive )
     archive.io( "is_favorite", is_favorite, false );
     archive.io( "item_counter", item_counter, static_cast<decltype( item_counter )>( 0 ) );
     archive.io( "rot", rot, 0_turns );
-    archive.io( "last_rot_check", last_rot_check, calendar::start_of_cataclysm );
     archive.io( "last_temp_check", last_temp_check, calendar::start_of_cataclysm );
     archive.io( "current_phase", cur_phase, static_cast<int>( type->phase ) );
     archive.io( "techniques", techniques, io::empty_default_tag() );

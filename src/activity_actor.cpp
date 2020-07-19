@@ -344,13 +344,14 @@ void dig_activity_actor::start( player_activity &act, Character & )
     act.moves_left = moves_total;
 }
 
-void dig_activity_actor::do_turn( player_activity &, Character & )
+void dig_activity_actor::do_turn( player_activity &, Character &who )
 {
     sfx::play_activity_sound( "tool", "shovel", sfx::get_heard_volume( location ) );
     if( calendar::once_every( 1_minutes ) ) {
         //~ Sound of a shovel digging a pit at work!
         sounds::sound( location, 10, sounds::sound_t::activity, _( "hsh!" ) );
     }
+    get_map().maybe_trigger_trap( location, who, true );
 }
 
 void dig_activity_actor::finish( player_activity &act, Character &who )
@@ -384,7 +385,7 @@ void dig_activity_actor::finish( player_activity &act, Character &who )
                 it->set_damage( rng( 1, it->max_damage() - 1 ) );
             }
         }
-        g->events().send<event_type::exhumes_grave>( who.getID() );
+        get_event_bus().send<event_type::exhumes_grave>( who.getID() );
     }
 
     here.ter_set( location, ter_id( result_terrain ) );
@@ -406,8 +407,6 @@ void dig_activity_actor::finish( player_activity &act, Character &who )
     }
 
     act.set_to_null();
-
-    here.maybe_trigger_trap( location, who, true );
 }
 
 void dig_activity_actor::serialize( JsonOut &jsout ) const
@@ -447,13 +446,14 @@ void dig_channel_activity_actor::start( player_activity &act, Character & )
     act.moves_left = moves_total;
 }
 
-void dig_channel_activity_actor::do_turn( player_activity &, Character & )
+void dig_channel_activity_actor::do_turn( player_activity &, Character &who )
 {
     sfx::play_activity_sound( "tool", "shovel", sfx::get_heard_volume( location ) );
     if( calendar::once_every( 1_minutes ) ) {
         //~ Sound of a shovel digging a pit at work!
         sounds::sound( location, 10, sounds::sound_t::activity, _( "hsh!" ) );
     }
+    get_map().maybe_trigger_trap( location, who, true );
 }
 
 void dig_channel_activity_actor::finish( player_activity &act, Character &who )
@@ -474,8 +474,6 @@ void dig_channel_activity_actor::finish( player_activity &act, Character &who )
                            here.ter( location ).obj().name() );
 
     act.set_to_null();
-
-    here.maybe_trigger_trap( location, who, true );
 }
 
 void dig_channel_activity_actor::serialize( JsonOut &jsout ) const
@@ -620,7 +618,7 @@ void hacking_activity_actor::finish( player_activity &act, Character &who )
         case hack_result::FAIL:
             // currently all things that can be hacked have equivalent alarm failure states.
             // this may not always be the case with new hackable things.
-            g->events().send<event_type::triggers_alarm>( who.getID() );
+            get_event_bus().send<event_type::triggers_alarm>( who.getID() );
             sounds::sound( who.pos(), 60, sounds::sound_t::music, _( "an alarm sound!" ), true, "environment",
                            "alarm" );
             if( examp.z > 0 && !g->timed_events.queued( timed_event_type::WANTED ) ) {
@@ -1141,25 +1139,24 @@ void consume_activity_actor::start( player_activity &act, Character &guy )
     if( consume_location ) {
         const auto ret = player_character.will_eat( *consume_location, true );
         if( !ret.success() ) {
+            canceled = true;
             consume_menu_selections = std::vector<int>();
             consume_menu_filter = std::string();
             return;
-        } else {
-            force = true;
         }
         moves = to_moves<int>( guy.get_consume_time( *consume_location ) );
     } else if( !consume_item.is_null() ) {
         const auto ret = player_character.will_eat( consume_item, true );
         if( !ret.success() ) {
+            canceled = true;
             consume_menu_selections = std::vector<int>();
             consume_menu_filter = std::string();
             return;
-        } else {
-            force = true;
         }
         moves = to_moves<int>( guy.get_consume_time( consume_item ) );
     } else {
         debugmsg( "Item/location to be consumed should not be null." );
+        canceled = true;
         return;
     }
 
@@ -1175,15 +1172,17 @@ void consume_activity_actor::finish( player_activity &act, Character & )
     act.interruptable = false;
 
     avatar &player_character = get_avatar();
-    if( consume_location ) {
-        player_character.consume( consume_location, force );
-    } else if( !consume_item.is_null() ) {
-        player_character.consume( consume_item, force );
-    } else {
-        debugmsg( "Item location/name to be consumed should not be null." );
-    }
-    if( player_character.get_value( "THIEF_MODE_KEEP" ) != "YES" ) {
-        player_character.set_value( "THIEF_MODE", "THIEF_ASK" );
+    if( !canceled ) {
+        if( consume_location ) {
+            player_character.consume( consume_location, /*force=*/true );
+        } else if( !consume_item.is_null() ) {
+            player_character.consume( consume_item, /*force=*/true );
+        } else {
+            debugmsg( "Item location/name to be consumed should not be null." );
+        }
+        if( player_character.get_value( "THIEF_MODE_KEEP" ) != "YES" ) {
+            player_character.set_value( "THIEF_MODE", "THIEF_ASK" );
+        }
     }
     //setting act to null clears these so back them up
     std::vector<int> temp_selections = consume_menu_selections;
@@ -1213,7 +1212,7 @@ void consume_activity_actor::serialize( JsonOut &jsout ) const
     jsout.member( "consume_item", consume_item );
     jsout.member( "consume_menu_selections", consume_menu_selections );
     jsout.member( "consume_menu_filter", consume_menu_filter );
-    jsout.member( "force", force );
+    jsout.member( "canceled", canceled );
 
     jsout.end_object();
 }
@@ -1229,7 +1228,7 @@ std::unique_ptr<activity_actor> consume_activity_actor::deserialize( JsonIn &jsi
     data.read( "consume_item", actor.consume_item );
     data.read( "consume_menu_selections", actor.consume_menu_selections );
     data.read( "consume_menu_filter", actor.consume_menu_filter );
-    data.read( "force", actor.force );
+    data.read( "canceled", actor.canceled );
 
     return actor.clone();
 }

@@ -515,7 +515,7 @@ void player::recalc_speed_bonus()
         }
         const float temperature_speed_modifier = mutation_value( "temperature_speed_modifier" );
         if( temperature_speed_modifier != 0 ) {
-            const auto player_local_temp = g->weather.get_temperature( pos() );
+            const auto player_local_temp = get_weather().get_temperature( pos() );
             if( has_trait( trait_COLDBLOOD4 ) || player_local_temp < 65 ) {
                 mod_speed_bonus( ( player_local_temp - 65 ) * temperature_speed_modifier );
             }
@@ -2677,7 +2677,7 @@ player::wear( item &to_wear, bool interactive )
     }
 
     if( was_weapon ) {
-        g->events().send<event_type::character_wields_item>( getID(), weapon.typeId() );
+        get_event_bus().send<event_type::character_wields_item>( getID(), weapon.typeId() );
     }
 
     return result;
@@ -2757,7 +2757,7 @@ bool player::add_or_drop_with_msg( item &it, const bool /*unloading*/, const ite
     } else if( !this->can_pickWeight( it, !get_option<bool>( "DANGEROUS_PICKUPS" ) ) ) {
         put_into_vehicle_or_drop( *this, item_drop_reason::too_heavy, { it } );
     } else {
-        const bool allow_wield = !weapon.has_item( it );
+        const bool allow_wield = !weapon.has_item( it ) && weapon.magazine_current() != &it;
         const int prev_charges = it.charges;
         auto &ni = this->i_add( it, true, avoid, /*allow_drop=*/false, /*allow_wield=*/allow_wield );
         if( ni.is_null() ) {
@@ -3574,7 +3574,7 @@ bool player::wield_contents( item &container, item *internal_item, bool penaltie
 
     weapon.on_wield( *this, mv );
 
-    g->events().send<event_type::character_wields_item>( getID(), weapon.typeId() );
+    get_event_bus().send<event_type::character_wields_item>( getID(), weapon.typeId() );
 
     return true;
 }

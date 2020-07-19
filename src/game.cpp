@@ -58,6 +58,7 @@
 #include "damage.h"
 #include "debug.h"
 #include "dependency_tree.h"
+#include "dialogue_chatbin.h"
 #include "editmap.h"
 #include "enums.h"
 #include "event.h"
@@ -281,7 +282,7 @@ static void achievement_attained( const achievement *a, bool achievements_enable
         add_msg( m_good, _( "You completed the achievement \"%s\"." ),
                  a->name() );
     }
-    g->events().send<event_type::player_gets_achievement>( a->id, achievements_enabled );
+    get_event_bus().send<event_type::player_gets_achievement>( a->id, achievements_enabled );
 }
 
 static void achievement_failed( const achievement *a, bool achievements_enabled )
@@ -292,7 +293,7 @@ static void achievement_failed( const achievement *a, bool achievements_enabled 
     if( achievements_enabled ) {
         add_msg( m_bad, _( "You lost the conduct \"%s\"." ), a->name() );
     }
-    g->events().send<event_type::player_fails_conduct>( a->id, achievements_enabled );
+    get_event_bus().send<event_type::player_fails_conduct>( a->id, achievements_enabled );
 }
 
 // This is the main game set-up process.
@@ -812,13 +813,13 @@ bool game::start_game()
         mission->assign( u );
     }
 
-    g->events().send<event_type::game_start>( u.getID(), u.name, u.male, u.prof->ident(),
+    get_event_bus().send<event_type::game_start>( u.getID(), u.name, u.male, u.prof->ident(),
             u.custom_profession, getVersionString() );
     time_played_at_last_load = std::chrono::seconds( 0 );
     time_of_last_load = std::chrono::steady_clock::now();
     tripoint abs_omt = u.global_omt_location();
     const oter_id &cur_ter = overmap_buffer.ter( abs_omt );
-    g->events().send<event_type::avatar_enters_omt>( abs_omt, cur_ter );
+    get_event_bus().send<event_type::avatar_enters_omt>( abs_omt, cur_ter );
     return true;
 }
 
@@ -3060,10 +3061,8 @@ void game::reset_npc_dispositions()
             continue;
         }
         npc *npc_to_add = npc_to_get.get();
-        npc_to_add->chatbin.missions.clear();
-        npc_to_add->chatbin.missions_assigned.clear();
+        npc_to_add->chatbin.clear_all();
         npc_to_add->mission = NPC_MISSION_NULL;
-        npc_to_add->chatbin.mission_selected = nullptr;
         npc_to_add->set_attitude( NPCATT_NULL );
         npc_to_add->op_of_u.anger = 0;
         npc_to_add->op_of_u.fear = 0;
@@ -12584,14 +12583,14 @@ void avatar_moves( const tripoint &old_abs_pos, const avatar &u, const map &m )
     if( u.is_mounted() ) {
         mount_type = u.mounted_creature->type->id;
     }
-    g->events().send<event_type::avatar_moves>( mount_type, m.ter( new_pos ).id(),
+    get_event_bus().send<event_type::avatar_moves>( mount_type, m.ter( new_pos ).id(),
             u.current_movement_mode(), u.is_underwater(), new_pos.z );
 
     const tripoint old_abs_omt = ms_to_omt_copy( old_abs_pos );
     const tripoint new_abs_omt = ms_to_omt_copy( new_abs_pos );
     if( old_abs_omt != new_abs_omt ) {
         const oter_id &cur_ter = overmap_buffer.ter( new_abs_omt );
-        g->events().send<event_type::avatar_enters_omt>( new_abs_omt, cur_ter );
+        get_event_bus().send<event_type::avatar_enters_omt>( new_abs_omt, cur_ter );
     }
 }
 } // namespace cata_event_dispatch
@@ -12601,7 +12600,36 @@ void game_ui::init_ui()
     g->init_ui( true );
 }
 
+Character &get_player_character()
+{
+    return g->u;
+}
+
+avatar &get_avatar()
+{
+    return g->u;
+}
+
+map &get_map()
+{
+    return g->m;
+}
+
 event_bus &get_event_bus()
 {
     return g->events();
+}
+
+const scenario *get_scenario()
+{
+    return g->scen;
+}
+void set_scenario( const scenario *new_scenario )
+{
+    g->scen = new_scenario;
+}
+
+stats_tracker &get_stats()
+{
+    return g->stats();
 }

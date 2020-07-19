@@ -397,7 +397,6 @@ item::item( const itype *type, time_point turn, int qty ) : type( type ), bday( 
     } else if( has_temperature() || goes_bad() ) {
         active = true;
         last_temp_check = bday;
-        last_rot_check = bday;
 
     } else if( type->tool ) {
         if( ammo_remaining() && !ammo_types().empty() ) {
@@ -466,7 +465,6 @@ item::item( const recipe *rec, int qty, std::list<item> items, std::vector<item_
     if( is_food() ) {
         active = true;
         last_temp_check = bday;
-        last_rot_check = bday;
         if( goes_bad() ) {
             const item *most_rotten = get_most_rotten_component( *this );
             if( most_rotten ) {
@@ -1695,9 +1693,6 @@ void item::debug_info( std::vector<iteminfo> &info, const iteminfo_query *parts,
                 info.push_back( iteminfo( "BASE", space + _( "max rot (turns): " ),
                                           "", iteminfo::lower_is_better,
                                           to_turns<int>( food->get_shelf_life() ) ) );
-                info.push_back( iteminfo( "BASE", _( "last rot: " ),
-                                          "", iteminfo::lower_is_better,
-                                          to_turn<int>( food->last_rot_check ) ) );
             }
             if( food && food->has_temperature() ) {
                 info.push_back( iteminfo( "BASE", _( "last temp: " ),
@@ -2241,7 +2236,7 @@ void item::gun_info( const item *mod, std::vector<iteminfo> &info, const iteminf
     if( parts->test( iteminfo_parts::GUN_RELOAD_TIME ) ) {
         info.emplace_back( "GUN", _( "Reload time: " ),
                            has_flag( flag_RELOAD_ONE ) ? _( "<num> moves per round" ) :
-                           _( "<num> moves " ),
+                           _( "<num> moves" ),
                            iteminfo::lower_is_better,  mod->get_reload_time() );
     }
 
@@ -2563,83 +2558,83 @@ void item::armor_info( std::vector<iteminfo> &info, const iteminfo_query *parts,
 
     if( parts->test( iteminfo_parts::ARMOR_BODYPARTS ) ) {
         insert_separation_line( info );
-        std::string coverage = _( "<bold>Covers</bold>: " );
+        std::string coverage = _( "<bold>Covers</bold>:" );
         if( covers( bodypart_id( "head" ) ) ) {
-            coverage += _( "The <info>head</info>. " );
+            coverage += _( " The <info>head</info>." );
         }
         if( covers( bodypart_id( "eyes" ) ) ) {
-            coverage += _( "The <info>eyes</info>. " );
+            coverage += _( " The <info>eyes</info>." );
         }
         if( covers( bodypart_id( "mouth" ) ) ) {
-            coverage += _( "The <info>mouth</info>. " );
+            coverage += _( " The <info>mouth</info>." );
         }
         if( covers( bodypart_id( "torso" ) ) ) {
-            coverage += _( "The <info>torso</info>. " );
+            coverage += _( " The <info>torso</info>." );
         }
 
         if( is_sided() && ( covers( bodypart_id( "arm_l" ) ) || covers( bodypart_id( "arm_r" ) ) ) ) {
-            coverage += _( "Either <info>arm</info>. " );
+            coverage += _( " Either <info>arm</info>." );
         } else if( covers( bodypart_id( "arm_l" ) ) && covers( bodypart_id( "arm_r" ) ) ) {
-            coverage += _( "The <info>arms</info>. " );
+            coverage += _( " The <info>arms</info>." );
         } else if( covers( bodypart_id( "arm_l" ) ) ) {
-            coverage += _( "The <info>left arm</info>. " );
+            coverage += _( " The <info>left arm</info>." );
         } else if( covers( bodypart_id( "arm_r" ) ) ) {
-            coverage += _( "The <info>right arm</info>. " );
+            coverage += _( " The <info>right arm</info>." );
         }
 
         if( is_sided() && ( covers( bodypart_id( "hand_l" ) ) || covers( bodypart_id( "hand_r" ) ) ) ) {
-            coverage += _( "Either <info>hand</info>. " );
+            coverage += _( " Either <info>hand</info>." );
         } else if( covers( bodypart_id( "hand_l" ) ) && covers( bodypart_id( "hand_r" ) ) ) {
-            coverage += _( "The <info>hands</info>. " );
+            coverage += _( " The <info>hands</info>." );
         } else if( covers( bodypart_id( "hand_l" ) ) ) {
-            coverage += _( "The <info>left hand</info>. " );
+            coverage += _( " The <info>left hand</info>." );
         } else if( covers( bodypart_id( "hand_r" ) ) ) {
-            coverage += _( "The <info>right hand</info>. " );
+            coverage += _( " The <info>right hand</info>." );
         }
 
         if( is_sided() && ( covers( bodypart_id( "leg_l" ) ) || covers( bodypart_id( "leg_r" ) ) ) ) {
-            coverage += _( "Either <info>leg</info>. " );
+            coverage += _( " Either <info>leg</info>." );
         } else if( covers( bodypart_id( "leg_l" ) ) && covers( bodypart_id( "leg_r" ) ) ) {
-            coverage += _( "The <info>legs</info>. " );
+            coverage += _( " The <info>legs</info>." );
         } else if( covers( bodypart_id( "leg_l" ) ) ) {
-            coverage += _( "The <info>left leg</info>. " );
+            coverage += _( " The <info>left leg</info>." );
         } else if( covers( bodypart_id( "leg_r" ) ) ) {
-            coverage += _( "The <info>right leg</info>. " );
+            coverage += _( " The <info>right leg</info>." );
         }
 
         if( is_sided() && ( covers( bodypart_id( "foot_l" ) ) || covers( bodypart_id( "foot_r" ) ) ) ) {
-            coverage += _( "Either <info>foot</info>. " );
+            coverage += _( " Either <info>foot</info>." );
         } else if( covers( bodypart_id( "foot_l" ) ) && covers( bodypart_id( "foot_r" ) ) ) {
-            coverage += _( "The <info>feet</info>. " );
+            coverage += _( " The <info>feet</info>." );
         } else if( covers( bodypart_id( "foot_l" ) ) ) {
-            coverage += _( "The <info>left foot</info>. " );
+            coverage += _( " The <info>left foot</info>." );
         } else if( covers( bodypart_id( "foot_r" ) ) ) {
-            coverage += _( "The <info>right foot</info>. " );
+            coverage += _( " The <info>right foot</info>." );
         }
 
         if( !covers_anything ) {
-            coverage += _( "<info>Nothing</info>." );
+            coverage += _( " <info>Nothing</info>." );
         }
 
         info.push_back( iteminfo( "ARMOR", coverage ) );
     }
 
     if( parts->test( iteminfo_parts::ARMOR_LAYER ) && covers_anything ) {
-        std::string layering = _( "Layer: " );
+        std::string layering = _( "Layer:" );
         if( has_flag( flag_PERSONAL ) ) {
-            layering += _( "<stat>Personal aura</stat>. " );
+            layering += _( " <stat>Personal aura</stat>." );
         } else if( has_flag( flag_SKINTIGHT ) ) {
-            layering += _( "<stat>Close to skin</stat>. " );
+            layering += _( " <stat>Close to skin</stat>." );
         } else if( has_flag( flag_BELTED ) ) {
-            layering += _( "<stat>Strapped</stat>. " );
+            layering += _( " <stat>Strapped</stat>." );
         } else if( has_flag( flag_OUTER ) ) {
-            layering += _( "<stat>Outer</stat>. " );
+            layering += _( " <stat>Outer</stat>." );
         } else if( has_flag( flag_WAIST ) ) {
-            layering += _( "<stat>Waist</stat>. " );
+            layering += _( " <stat>Waist</stat>." );
         } else if( has_flag( flag_AURA ) ) {
-            layering += _( "<stat>Outer aura</stat>. " );
+            layering += _( " <stat>Outer aura</stat>." );
         } else {
-            layering += _( "<stat>Normal</stat>. " );
+            layering += _( " <stat>Normal</stat>." );
         }
 
         info.push_back( iteminfo( "ARMOR", layering ) );
@@ -2718,7 +2713,7 @@ void item::armor_info( std::vector<iteminfo> &info, const iteminfo_query *parts,
                 // Handle things that use both sides to avoid showing L. Arm R. Arm etc when both are the same
                 if( !t->sided ) {
                     for( const body_part &legacy_part : all_body_parts ) {
-                        bodypart_str_id bp( convert_bp( legacy_part ) );
+                        const bodypart_str_id &bp( convert_bp( legacy_part ) );
                         bodypart_str_id opposite = bp->opposite_part;
                         if( opposite != bp && covers( bp ) && covers( opposite )
                             && to_display_data.at( bp ).portion == to_display_data.at( opposite ).portion
@@ -3396,58 +3391,59 @@ void item::bionic_info( std::vector<iteminfo> &info, const iteminfo_query *parts
     insert_separation_line( info );
 
     if( !bid->encumbrance.empty() ) {
-        info.push_back( iteminfo( "DESCRIPTION", _( "<bold>Encumbrance</bold>: " ),
+        info.push_back( iteminfo( "DESCRIPTION", _( "<bold>Encumbrance</bold>:" ),
                                   iteminfo::no_newline ) );
         for( const std::pair<const bodypart_str_id, int> &element : bid->encumbrance ) {
-            info.push_back( iteminfo( "CBM", body_part_name_as_heading( element.first.id(), 1 ),
-                                      " <num> ", iteminfo::no_newline, element.second ) );
+            info.push_back(
+                iteminfo( "CBM", " " + body_part_name_as_heading( element.first.id(), 1 ),
+                          " <num>", iteminfo::no_newline, element.second ) );
         }
     }
 
     if( !bid->env_protec.empty() ) {
         info.push_back( iteminfo( "DESCRIPTION",
-                                  _( "<bold>Environmental Protection</bold>: " ),
+                                  _( "<bold>Environmental Protection</bold>:" ),
                                   iteminfo::no_newline ) );
         for( const std::pair< const bodypart_str_id, size_t > &element : bid->env_protec ) {
-            info.push_back( iteminfo( "CBM", body_part_name_as_heading( element.first, 1 ),
-                                      " <num> ", iteminfo::no_newline, element.second ) );
+            info.push_back( iteminfo( "CBM", " " + body_part_name_as_heading( element.first, 1 ),
+                                      " <num>", iteminfo::no_newline, element.second ) );
         }
     }
 
     if( !bid->bash_protec.empty() ) {
         info.push_back( iteminfo( "DESCRIPTION",
-                                  _( "<bold>Bash Protection</bold>: " ),
+                                  _( "<bold>Bash Protection</bold>:" ),
                                   iteminfo::no_newline ) );
         for( const std::pair< const bodypart_str_id, size_t > &element : bid->bash_protec ) {
-            info.push_back( iteminfo( "CBM", body_part_name_as_heading( element.first, 1 ),
-                                      " <num> ", iteminfo::no_newline, element.second ) );
+            info.push_back( iteminfo( "CBM", " " + body_part_name_as_heading( element.first, 1 ),
+                                      " <num>", iteminfo::no_newline, element.second ) );
         }
     }
 
     if( !bid->cut_protec.empty() ) {
         info.push_back( iteminfo( "DESCRIPTION",
-                                  _( "<bold>Cut Protection</bold>: " ),
+                                  _( "<bold>Cut Protection</bold>:" ),
                                   iteminfo::no_newline ) );
         for( const std::pair< const bodypart_str_id, size_t > &element : bid->cut_protec ) {
-            info.push_back( iteminfo( "CBM", body_part_name_as_heading( element.first, 1 ),
-                                      " <num> ", iteminfo::no_newline, element.second ) );
+            info.push_back( iteminfo( "CBM", " " + body_part_name_as_heading( element.first, 1 ),
+                                      " <num>", iteminfo::no_newline, element.second ) );
         }
     }
 
     if( !bid->bullet_protec.empty() ) {
-        info.push_back( iteminfo( "DESCRIPTION", _( "<bold>Ballistic Protection</bold>: " ),
+        info.push_back( iteminfo( "DESCRIPTION", _( "<bold>Ballistic Protection</bold>:" ),
                                   iteminfo::no_newline ) );
         for( const std::pair<const bodypart_str_id, size_t > &element : bid->bullet_protec ) {
-            info.push_back( iteminfo( "CBM", body_part_name_as_heading( element.first, 1 ),
-                                      " <num> ", iteminfo::no_newline, element.second ) );
+            info.push_back( iteminfo( "CBM", " " + body_part_name_as_heading( element.first, 1 ),
+                                      " <num>", iteminfo::no_newline, element.second ) );
         }
     }
 
     if( !bid->stat_bonus.empty() ) {
-        info.push_back( iteminfo( "DESCRIPTION", _( "<bold>Stat Bonus</bold>: " ),
+        info.push_back( iteminfo( "DESCRIPTION", _( "<bold>Stat Bonus</bold>:" ),
                                   iteminfo::no_newline ) );
         for( const auto &element : bid->stat_bonus ) {
-            info.push_back( iteminfo( "CBM", get_stat_name( element.first ), " <num> ",
+            info.push_back( iteminfo( "CBM", " " + get_stat_name( element.first ), " <num>",
                                       iteminfo::no_newline, element.second ) );
         }
     }
@@ -5467,11 +5463,11 @@ void item::set_relative_rot( double val )
 {
     if( goes_bad() ) {
         rot = get_shelf_life() * val;
-        // calc_rot uses last_rot_check (when it's not turn_zero) instead of bday.
+        // calc_rot uses last_temp_check (when it's not turn_zero) instead of bday.
         // this makes sure the rotting starts from now, not from bday.
         // if this item is the result of smoking or milling don't do this, we want to start from bday.
         if( !has_flag( flag_PROCESSING_RESULT ) ) {
-            last_rot_check = calendar::turn;
+            last_temp_check = calendar::turn;
         }
     }
 }
@@ -5565,19 +5561,18 @@ int get_hourly_rotpoints_at_temp( const int temp )
     return rot_chart[temp];
 }
 
-void item::calc_rot( time_point time, int temp, const float spoil_modifier )
+void item::calc_rot( int temp, const float spoil_modifier,
+                     const time_duration &time_delta )
 {
     // Avoid needlessly calculating already rotten things.  Corpses should
     // always rot away and food rots away at twice the shelf life.  If the food
     // is in a sealed container they won't rot away, this avoids needlessly
     // calculating their rot in that case.
     if( !is_corpse() && get_relative_rot() > 2.0 ) {
-        last_rot_check = time;
         return;
     }
 
     if( item_tags.count( "FROZEN" ) ) {
-        last_rot_check = time;
         return;
     }
 
@@ -5598,14 +5593,12 @@ void item::calc_rot( time_point time, int temp, const float spoil_modifier )
     // conditions by applying starting variation bonus/penalty of +/- 20% of base shelf-life
     // positive = food was produced some time before calendar::start and/or bad storage
     // negative = food was stored in good conditions before calendar::start
-    if( last_rot_check <= calendar::start_of_cataclysm ) {
+    if( last_temp_check <= calendar::start_of_cataclysm ) {
         time_duration spoil_variation = get_shelf_life() * 0.2f;
         rot += rng( -spoil_variation, spoil_variation );
     }
 
-    time_duration time_delta = time - last_rot_check;
     rot += factor * time_delta / 1_hours * get_hourly_rotpoints_at_temp( temp ) * 1_turns;
-    last_rot_check = time;
 }
 
 void item::calc_rot_while_processing( time_duration processing_duration )
@@ -5616,7 +5609,6 @@ void item::calc_rot_while_processing( time_duration processing_duration )
     }
 
     // Apply no rot or temperature while smoking
-    last_rot_check += processing_duration;
     last_temp_check += processing_duration;
 }
 
@@ -7551,28 +7543,9 @@ bool item::magazine_integral() const
     return contents.has_pocket_type( item_pocket::pocket_type::MAGAZINE );
 }
 
-itype_id item::magazine_default( bool conversion ) const
+itype_id item::magazine_default( bool /* conversion */ ) const
 {
-    if( !magazine_compatible( conversion ).empty() ) {
-        if( conversion ) {
-            for( const item *m : is_gun() ? gunmods() : toolmods() ) {
-                if( !m->type->mod->magazine_adaptor.empty() ) {
-                    auto mags = m->type->mod->magazine_adaptor.find( ammotype( *ammo_types( conversion ).begin() ) );
-                    if( mags != m->type->mod->magazine_adaptor.end() ) {
-                        return *( mags->second.begin() );
-                    }
-                }
-            }
-        }
-        if( !ammo_types( conversion ).empty() ) {
-            auto mag = type->magazine_default.find( ammotype( *ammo_types( conversion ).begin() ) );
-            if( mag != type->magazine_default.end() ) {
-                return mag->second;
-            }
-        }
-        return *magazine_compatible( conversion ).begin();
-    }
-    return itype_id::NULL_ID();
+    return contents.magazine_default();
 }
 
 std::set<itype_id> item::magazine_compatible( bool /* conversion */ ) const
@@ -7946,7 +7919,7 @@ void item::casings_handle( const std::function<bool( item & )> &func )
     contents.casings_handle( func );
 }
 
-bool item::reload( player &u, item_location ammo, int qty )
+bool item::reload( Character &u, item_location ammo, int qty )
 {
     if( qty <= 0 ) {
         debugmsg( "Tried to reload zero or less charges" );
@@ -8668,6 +8641,11 @@ iteminfo::iteminfo( const std::string &Type, const std::string &Name, const std:
     bDrawName = !( Flags & no_name );
 }
 
+iteminfo::iteminfo( const std::string &Type, const std::string &Name, flags Flags )
+    : iteminfo( Type, Name, "", Flags )
+{
+}
+
 iteminfo::iteminfo( const std::string &Type, const std::string &Name, double Value )
     : iteminfo( Type, Name, "", no_flags, Value )
 {
@@ -8744,18 +8722,6 @@ bool item::has_rotten_away() const
         return get_rot() > 10_days;
     } else {
         return is_food() && get_relative_rot() > 2.0;
-    }
-}
-
-bool item::has_rotten_away( const tripoint &pnt, float spoil_multiplier, temperature_flag flag )
-{
-    if( goes_bad() ) {
-        process_temperature_rot( 1, pnt, nullptr, flag, spoil_multiplier );
-        return has_rotten_away();
-    } else {
-        contents.remove_rotten( pnt );
-
-        return false;
     }
 }
 
@@ -8894,11 +8860,9 @@ bool item::process_temperature_rot( float insulation, const tripoint &pos,
     const time_point now = calendar::turn;
 
     // if player debug menu'd the time backward it breaks stuff, just reset the
-    // last_temp_check and last_rot_check in this case
-    // if spoil_modifier is 0 then similarly it will not rot
-    if( now - last_temp_check < 0_turns || spoil_modifier == 0.0f ) {
+    // last_temp_check in this case
+    if( now - last_temp_check < 0_turns ) {
         reset_temp_check();
-        last_rot_check = now;
         return false;
     }
 
@@ -8909,7 +8873,7 @@ bool item::process_temperature_rot( float insulation, const tripoint &pos,
         return false;
     }
 
-    int temp = g->weather.get_temperature( pos );
+    int temp = get_weather().get_temperature( pos );
 
     switch( flag ) {
         case temperature_flag::NORMAL:
@@ -8938,20 +8902,14 @@ bool item::process_temperature_rot( float insulation, const tripoint &pos,
         temp += 5;
     }
 
-    time_point time;
+    time_point time = last_temp_check;
     item_internal::scoped_goes_bad_cache _cache( this );
-    const bool process_rot = goes_bad();
-
-    if( process_rot ) {
-        time = std::min( last_rot_check, last_temp_check );
-    } else {
-        time = last_temp_check;
-    }
+    const bool process_rot = goes_bad() && spoil_modifier != 0;
 
     if( now - time > 1_hours ) {
         // This code is for items that were left out of reality bubble for long time
 
-        const weather_generator &wgen = g->weather.get_cur_weather_gen();
+        const weather_generator &wgen = get_weather().get_cur_weather_gen();
         const unsigned int seed = g->get_seed();
         int local_mod = g->new_game ? 0 : get_map().get_temperature( pos );
 
@@ -8968,15 +8926,16 @@ bool item::process_temperature_rot( float insulation, const tripoint &pos,
             local_mod += 5; // body heat increases inventory temperature
         }
 
-        // Process the past of this item since the last time it was processed
+        // Process the past of this item in 1h chunks until there is less than 1h left.
+        time_duration time_delta = 1_hours;
+
         while( now - time > 1_hours ) {
-            // Get the environment temperature
-            time_duration time_delta = std::min( 1_hours, now - 1_hours - time );
             time += time_delta;
 
-            //Use weather if above ground, use map temp if below
+            // Get the environment temperature
+            // Use weather if above ground, use map temp if below
             double env_temperature = 0;
-            if( pos.z >= 0 ) {
+            if( pos.z >= 0 && flag != temperature_flag::ROOT_CELLAR ) {
                 double weather_temperature = wgen.get_weather_temperature( pos, time, seed );
                 env_temperature = weather_temperature + enviroment_mod + local_mod;
             } else {
@@ -9004,18 +8963,15 @@ bool item::process_temperature_rot( float insulation, const tripoint &pos,
             }
 
             // Calculate item temperature from environment temperature
-            // If the time was more than 2 d ago just set the item to environment temperature
-            if( now - time > 2_days ) {
-                // This value shouldn't be there anymore after the loop is done so we don't bother with the set_item_temperature()
-                temperature = static_cast<int>( 100000 * temp_to_kelvin( env_temperature ) );
-                last_temp_check = time;
-            } else if( time - last_temp_check > smallest_interval ) {
-                calc_temp( env_temperature, insulation, time );
+            // If the time was more than 2 d ago we do not care about item temperature.
+            if( now - time < 2_days ) {
+                calc_temp( env_temperature, insulation, time_delta );
             }
+            last_temp_check = time;
 
             // Calculate item rot
-            if( process_rot && time - last_rot_check > smallest_interval ) {
-                calc_rot( time, env_temperature, spoil_modifier );
+            if( process_rot ) {
+                calc_rot( env_temperature, spoil_modifier, time_delta );
 
                 if( has_rotten_away() && carrier == nullptr ) {
                     // No need to track item that will be gone
@@ -9028,9 +8984,10 @@ bool item::process_temperature_rot( float insulation, const tripoint &pos,
     // Remaining <1 h from above
     // and items that are held near the player
     if( now - time > smallest_interval ) {
-        calc_temp( temp, insulation, now );
+        calc_temp( temp, insulation, now - time );
+        last_temp_check = now;
         if( process_rot ) {
-            calc_rot( now, temp, spoil_modifier );
+            calc_rot( temp, spoil_modifier, now - time );
             return has_rotten_away() && carrier == nullptr;
         }
     }
@@ -9042,7 +8999,7 @@ bool item::process_temperature_rot( float insulation, const tripoint &pos,
     return false;
 }
 
-void item::calc_temp( const int temp, const float insulation, const time_point &time )
+void item::calc_temp( const int temp, const float insulation, const time_duration &time_delta )
 {
     // Limit calculations to max 4000 C (4273.15 K) to avoid specific energy from overflowing
     const float env_temperature = std::min( temp_to_kelvin( temp ), 4273.15 );
@@ -9051,7 +9008,6 @@ void item::calc_temp( const int temp, const float insulation, const time_point &
 
     // If no or only small temperature difference then no need to do math.
     if( std::abs( temperature_difference ) < 0.9 ) {
-        last_temp_check = time;
         return;
     }
     const float mass = to_gram( weight() ); // g
@@ -9059,7 +9015,6 @@ void item::calc_temp( const int temp, const float insulation, const time_point &
     // If item has negative energy set to environment temperature (it not been processed ever)
     if( specific_energy < 0 ) {
         set_item_temperature( env_temperature );
-        last_temp_check = time;
         return;
     }
 
@@ -9080,7 +9035,6 @@ void item::calc_temp( const int temp, const float insulation, const time_point &
     float new_item_temperature;
     float freeze_percentage = 0;
     int extra_time;
-    const time_duration time_delta = time - last_temp_check;
 
     // Temperature calculations based on Newton's law of cooling.
     // Calculations are done assuming that the item stays in its phase.
@@ -9109,7 +9063,6 @@ void item::calc_temp( const int temp, const float insulation, const time_point &
                 // This may happen rarely with very small items
                 // Just set the item to environment temperature
                 set_item_temperature( env_temperature );
-                last_temp_check = time;
                 return;
             }
         }
@@ -9138,7 +9091,6 @@ void item::calc_temp( const int temp, const float insulation, const time_point &
                 // This may happen rarely with very small items
                 // Just set the item to environment temperature
                 set_item_temperature( env_temperature );
-                last_temp_check = time;
                 return;
             }
         }
@@ -9220,7 +9172,6 @@ void item::calc_temp( const int temp, const float insulation, const time_point &
     temperature = std::lround( 100000 * new_item_temperature );
     specific_energy = std::lround( 100000 * new_specific_energy );
 
-    last_temp_check = time;
 }
 
 float item::get_item_thermal_energy() const
@@ -9720,9 +9671,9 @@ bool item::process( player *carrier, const tripoint &pos, float insulation,
     return process_internal( carrier, pos, insulation, flag, spoil_multiplier_parent );
 }
 
-void item::set_last_rot_check( const time_point &pt )
+void item::set_last_temp_check( const time_point &pt )
 {
-    last_rot_check = pt;
+    last_temp_check = pt;
 }
 
 bool item::process_internal( player *carrier, const tripoint &pos,
@@ -10120,8 +10071,8 @@ void item::legacy_fast_forward_time()
 
     rot *= 6;
 
-    const time_duration tmp_rot = ( last_rot_check - calendar::turn_zero ) * 6;
-    last_rot_check = calendar::turn_zero + tmp_rot;
+    const time_duration tmp_temp = ( last_temp_check - calendar::turn_zero ) * 6;
+    last_temp_check = calendar::turn_zero + tmp_temp;
 }
 
 time_point item::birthday() const

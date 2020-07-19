@@ -400,12 +400,6 @@ std::string enum_to_string<blood_type>( blood_type data )
 
 } // namespace io
 
-Character &get_player_character()
-{
-    return g->u;
-}
-
-
 // *INDENT-OFF*
 Character::Character() :
 
@@ -1879,16 +1873,11 @@ void Character::recalc_sight_limits()
         vision_mode_cache.set( IR_VISION );
     }
 
-    // Since this is called from the player constructor,
-    // these are going to resolve to Character::has_artifact_with() anyway
-    // This case should be harmless to apply artifact effects to NPCs.
-    if( Character::has_artifact_with( AEP_SUPER_CLAIRVOYANCE ) ) {
+    if( has_trait_flag( "SUPER_CLAIRVOYANCE" ) ) {
         vision_mode_cache.set( VISION_CLAIRVOYANCE_SUPER );
-    }
-    if( Character::has_artifact_with( AEP_CLAIRVOYANCE_PLUS ) ) {
+    } else if( has_trait_flag( "CLAIRVOYANCE_PLUS" ) ) {
         vision_mode_cache.set( VISION_CLAIRVOYANCE_PLUS );
-    }
-    if( Character::has_artifact_with( AEP_CLAIRVOYANCE ) ) {
+    } else if( has_trait_flag( "CLAIRVOYANCE" ) ) {
         vision_mode_cache.set( VISION_CLAIRVOYANCE );
     }
 }
@@ -2012,13 +2001,15 @@ bionic_id Character::get_remote_fueled_bionic() const
 
 bool Character::can_fuel_bionic_with( const item &it ) const
 {
-    if( !it.is_fuel() ) {
+    if( !it.is_fuel() && !it.type->magazine ) {
         return false;
     }
 
     for( const bionic_id &bid : get_bionics() ) {
         for( const itype_id &fuel : bid->fuel_opts ) {
             if( fuel == it.typeId() ) {
+                return true;
+            } else if( it.type->magazine && fuel == it.ammo_current() ) {
                 return true;
             }
         }
@@ -2033,6 +2024,8 @@ std::vector<bionic_id> Character::get_bionic_fueled_with( const item &it ) const
     for( const bionic_id &bid : get_bionics() ) {
         for( const itype_id &fuel : bid->fuel_opts ) {
             if( fuel == it.typeId() ) {
+                bionics.emplace_back( bid );
+            } else if( it.type->magazine && fuel == it.ammo_current() ) {
                 bionics.emplace_back( bid );
             }
         }
@@ -2125,7 +2118,7 @@ void Character::practice( const skill_id &id, int amount, int cap, bool suppress
         int newLevel = get_skill_level( id );
         std::string skill_name = skill.name();
         if( newLevel > oldLevel ) {
-            g->events().send<event_type::gains_skill_level>( getID(), id, newLevel );
+            get_event_bus().send<event_type::gains_skill_level>( getID(), id, newLevel );
         }
         if( is_player() && newLevel > oldLevel ) {
             add_msg( m_good, _( "Your skill in %s has increased to %d!" ), skill_name, newLevel );
@@ -2374,7 +2367,7 @@ cata::optional<std::list<item>::iterator> Character::wear_item( const item &to_w
     std::list<item>::iterator position = position_to_wear_new_item( to_wear );
     std::list<item>::iterator new_item_it = worn.insert( position, to_wear );
 
-    g->events().send<event_type::character_wears_item>( getID(), last_item );
+    get_event_bus().send<event_type::character_wears_item>( getID(), last_item );
 
     if( interactive ) {
         add_msg_player_or_npc(
@@ -2790,7 +2783,7 @@ item Character::remove_weapon()
 {
     item tmp = weapon;
     weapon = item();
-    g->events().send<event_type::character_wields_item>( getID(), weapon.typeId() );
+    get_event_bus().send<event_type::character_wields_item>( getID(), weapon.typeId() );
     cached_info.erase( "weapon_value" );
     return tmp;
 }
@@ -3067,25 +3060,51 @@ units::volume Character::volume_carried_with_tweaks( const item_tweaks &tweaks )
     units::volume ret = 0_ml;
     for( auto &i : worn ) {
         if( !without.count( &i ) ) {
-            for( auto j : i.contents.all_items_top( item_pocket::pocket_type::CONTAINER ) ) {
-                if( j->count_by_charges() ) {
-                    ret += j->volume() - get_selected_stack_volume( j, without );
-                } else if( !without.count( j ) ) {
-                    ret += j->volume();
-                }
-            }
+            ret += get_contents_volume_with_tweaks( &i.contents, without );
         }
     }
 
     // Wielded item
     if( !without.count( &weapon ) ) {
-        for( auto i : weapon.contents.all_items_top( item_pocket::pocket_type::CONTAINER ) ) {
-            if( i->count_by_charges() ) {
-                ret += i->volume() - get_selected_stack_volume( i, without );
-            } else if( !without.count( i ) ) {
-                ret += i->volume();
-            }
+        ret += get_contents_volume_with_tweaks( &weapon.contents, without );
+    }
+
+    return ret;
+}
+
+units::volume Character::get_contents_volume_with_tweaks( const item_contents *contents,
+        const std::map<const item *, int> &without ) const
+{
+    units::volume ret = 0_ml;
+
+    for( auto i : contents->all_items_top( item_pocket::pocket_type::CONTAINER ) ) {
+        if( i->count_by_charges() ) {
+            ret += i->volume() - get_selected_stack_volume( i, without );
+        } else if( !without.count( i ) ) {
+            ret += i->volume();
+            ret -= get_nested_content_volume_recursive( &i->contents, without );
         }
+    }
+
+    return ret;
+}
+
+units::volume Character::get_nested_content_volume_recursive( const item_contents *contents,
+        const std::map<const item *, int> &without ) const
+{
+    units::volume ret = 0_ml;
+
+    for( auto i : contents->all_items_top( item_pocket::pocket_type::CONTAINER ) ) {
+        if( i->count_by_charges() ) {
+            ret += get_selected_stack_volume( i, without );
+        } else if( without.count( i ) ) {
+            ret += i->volume();
+        } else {
+            ret += get_nested_content_volume_recursive( &i->contents, without );
+        }
+    }
+    if( contents->all_pockets_rigid() ) {
+        ret += contents->remaining_container_capacity();
     }
 
     return ret;
@@ -5280,7 +5299,7 @@ needs_rates Character::calc_needs_rates() const
 
     if( has_trait( trait_TRANSPIRATION ) ) {
         // Transpiration, the act of moving nutrients with evaporating water, can take a very heavy toll on your thirst when it's really hot.
-        rates.thirst *= ( ( g->weather.get_temperature( pos() ) - 32.5f ) / 40.0f );
+        rates.thirst *= ( ( get_weather().get_temperature( pos() ) - 32.5f ) / 40.0f );
     }
 
     if( is_npc() ) {
@@ -5301,13 +5320,13 @@ void Character::check_needs_extremes()
         add_msg_player_or_npc( m_bad,
                                _( "You have a sudden heart attack!" ),
                                _( "<npcname> has a sudden heart attack!" ) );
-        g->events().send<event_type::dies_from_drug_overdose>( getID(), efftype_id() );
+        get_event_bus().send<event_type::dies_from_drug_overdose>( getID(), efftype_id() );
         set_part_hp_cur( bodypart_id( "torso" ), 0 );
     } else if( get_stim() < -200 || get_painkiller() > 240 ) {
         add_msg_player_or_npc( m_bad,
                                _( "Your breathing stops completely." ),
                                _( "<npcname>'s breathing stops completely." ) );
-        g->events().send<event_type::dies_from_drug_overdose>( getID(), efftype_id() );
+        get_event_bus().send<event_type::dies_from_drug_overdose>( getID(), efftype_id() );
         set_part_hp_cur( bodypart_id( "torso" ), 0 );
     } else if( has_effect( effect_jetinjector ) && get_effect_dur( effect_jetinjector ) > 40_minutes ) {
         if( !( has_trait( trait_NOPAIN ) ) ) {
@@ -5318,19 +5337,19 @@ void Character::check_needs_extremes()
             add_msg_player_or_npc( _( "Your heart spasms and stops." ),
                                    _( "<npcname>'s heart spasms and stops." ) );
         }
-        g->events().send<event_type::dies_from_drug_overdose>( getID(), effect_jetinjector );
+        get_event_bus().send<event_type::dies_from_drug_overdose>( getID(), effect_jetinjector );
         set_part_hp_cur( bodypart_id( "torso" ), 0 );
     } else if( get_effect_dur( effect_adrenaline ) > 50_minutes ) {
         add_msg_player_or_npc( m_bad,
                                _( "Your heart spasms and stops." ),
                                _( "<npcname>'s heart spasms and stops." ) );
-        g->events().send<event_type::dies_from_drug_overdose>( getID(), effect_adrenaline );
+        get_event_bus().send<event_type::dies_from_drug_overdose>( getID(), effect_adrenaline );
         set_part_hp_cur( bodypart_id( "torso" ), 0 );
     } else if( get_effect_int( effect_drunk ) > 4 ) {
         add_msg_player_or_npc( m_bad,
                                _( "Your breathing slows down to a stop." ),
                                _( "<npcname>'s breathing slows down to a stop." ) );
-        g->events().send<event_type::dies_from_drug_overdose>( getID(), effect_drunk );
+        get_event_bus().send<event_type::dies_from_drug_overdose>( getID(), effect_drunk );
         set_part_hp_cur( bodypart_id( "torso" ), 0 );
     }
 
@@ -5338,7 +5357,7 @@ void Character::check_needs_extremes()
     if( is_player() ) {
         if( get_stored_kcal() <= 0 ) {
             add_msg_if_player( m_bad, _( "You have starved to death." ) );
-            g->events().send<event_type::dies_of_starvation>( getID() );
+            get_event_bus().send<event_type::dies_of_starvation>( getID() );
             set_part_hp_cur( bodypart_id( "torso" ), 0 );
         } else {
             if( calendar::once_every( 12_hours ) ) {
@@ -5378,7 +5397,7 @@ void Character::check_needs_extremes()
             guts.get_water() == 0_ml ) ) {
         if( get_thirst() >= 1200 ) {
             add_msg_if_player( m_bad, _( "You have died of dehydration." ) );
-            g->events().send<event_type::dies_of_thirst>( getID() );
+            get_event_bus().send<event_type::dies_of_thirst>( getID() );
             set_part_hp_cur( bodypart_id( "torso" ), 0 );
         } else if( get_thirst() >= 1000 && calendar::once_every( 30_minutes ) ) {
             add_msg_if_player( m_warning, _( "Even your eyes feel dry…" ) );
@@ -5393,7 +5412,7 @@ void Character::check_needs_extremes()
     if( get_fatigue() >= fatigue_levels::EXHAUSTED + 25 && !in_sleep_state() ) {
         if( get_fatigue() >= fatigue_levels::MASSIVE_FATIGUE ) {
             add_msg_if_player( m_bad, _( "Survivor sleep now." ) );
-            g->events().send<event_type::falls_asleep_from_exhaustion>( getID() );
+            get_event_bus().send<event_type::falls_asleep_from_exhaustion>( getID() );
             mod_fatigue( -10 );
             fall_asleep();
         } else if( get_fatigue() >= 800 && calendar::once_every( 30_minutes ) ) {
@@ -5654,7 +5673,7 @@ void Character::update_bodytemp()
 
     const int lying_warmth = use_floor_warmth ? floor_warmth( pos() ) : 0;
     const int water_temperature =
-        100 * temp_to_celsius( g->weather.get_cur_weather_gen().get_water_temperature() );
+        100 * temp_to_celsius( get_weather().get_cur_weather_gen().get_water_temperature() );
 
     // Correction of body temperature due to traits and mutations
     // Lower heat is applied always
@@ -8166,7 +8185,7 @@ void Character::wake_up()
     // effects) with a duration of 0 turns.
 
     if( has_effect( effect_sleep ) ) {
-        g->events().send<event_type::character_wakes_up>( getID() );
+        get_event_bus().send<event_type::character_wakes_up>( getID() );
         get_effect( effect_sleep ).set_duration( 0_turns );
     }
     remove_effect( effect_slept_through_alarm );
@@ -8289,7 +8308,7 @@ void Character::shout( std::string msg, bool order )
 
 void Character::vomit()
 {
-    g->events().send<event_type::throws_up>( getID() );
+    get_event_bus().send<event_type::throws_up>( getID() );
 
     if( stomach.contains() != 0_ml ) {
         stomach.empty();
@@ -8474,19 +8493,14 @@ void Character::recalculate_enchantment_cache()
     // start by resetting the cache to all inventory items
     enchantment_cache = inv.get_active_enchantment_cache( *this );
 
-    for( const enchantment &ench : weapon.get_enchantments() ) {
-        if( ench.is_active( *this, weapon ) ) {
-            enchantment_cache.force_add( ench );
-        }
-    }
-
-    for( const item &worn_it : worn ) {
-        for( const enchantment &ench : worn_it.get_enchantments() ) {
-            if( ench.is_active( *this, worn_it ) ) {
+    visit_items( [&]( const item * it ) {
+        for( const enchantment &ench : it->get_enchantments() ) {
+            if( ench.is_active( *this, *it ) ) {
                 enchantment_cache.force_add( ench );
             }
         }
-    }
+        return VisitResponse::NEXT;
+    } );
 
     // get from traits/ mutations
     for( const std::pair<const trait_id, trait_data> &mut_map : my_mutations ) {
@@ -8961,10 +8975,10 @@ void Character::apply_damage( Creature *source, bodypart_id hurt, int dam, const
 
     mod_pain( dam / 2 );
 
-    const int dam_to_bodypart = std::min( dam, get_part_hp_cur( hurt ) );
+    const int dam_to_bodypart = std::min( dam, get_part_hp_cur( hurt->main_part ) );
 
-    mod_part_hp_cur( hurt, - dam_to_bodypart );
-    g->events().send<event_type::character_takes_damage>( getID(), dam_to_bodypart );
+    mod_part_hp_cur( hurt->main_part, - dam_to_bodypart );
+    get_event_bus().send<event_type::character_takes_damage>( getID(), dam_to_bodypart );
 
     if( !weapon.is_null() && !as_player()->can_wield( weapon ).success() &&
         can_unwield( weapon ).success() ) {
@@ -8973,9 +8987,9 @@ void Character::apply_damage( Creature *source, bodypart_id hurt, int dam, const
         put_into_vehicle_or_drop( *this, item_drop_reason::tumbling, { weapon } );
         i_rem( &weapon );
     }
-    if( has_effect( effect_mending, hurt->token ) && ( source == nullptr ||
+    if( has_effect( effect_mending, hurt->main_part->token ) && ( source == nullptr ||
             !source->is_hallucination() ) ) {
-        effect &e = get_effect( effect_mending, hurt->token );
+        effect &e = get_effect( effect_mending, hurt->main_part->token );
         float remove_mend = dam / 20.0f;
         e.mod_duration( -e.get_max_duration() * remove_mend );
     }
@@ -8987,11 +9001,11 @@ void Character::apply_damage( Creature *source, bodypart_id hurt, int dam, const
     if( !bypass_med ) {
         // remove healing effects if damaged
         int remove_med = roll_remainder( dam / 5.0f );
-        if( remove_med > 0 && has_effect( effect_bandaged, hurt->token ) ) {
-            remove_med -= reduce_healing_effect( effect_bandaged, remove_med, hurt );
+        if( remove_med > 0 && has_effect( effect_bandaged, hurt->main_part->token ) ) {
+            remove_med -= reduce_healing_effect( effect_bandaged, remove_med, hurt->main_part );
         }
-        if( remove_med > 0 && has_effect( effect_disinfected, hurt->token ) ) {
-            reduce_healing_effect( effect_disinfected, remove_med, hurt );
+        if( remove_med > 0 && has_effect( effect_disinfected, hurt->main_part->token ) ) {
+            reduce_healing_effect( effect_disinfected, remove_med, hurt->main_part );
         }
     }
 }
@@ -9181,7 +9195,7 @@ void Character::heal( const bodypart_id &healed, int dam )
     if( !is_limb_broken( healed ) ) {
         int effective_heal = std::min( dam, get_part_hp_max( healed ) - get_part_hp_cur( healed ) );
         mod_part_hp_cur( healed, effective_heal );
-        g->events().send<event_type::character_heals_damage>( getID(), effective_heal );
+        get_event_bus().send<event_type::character_heals_damage>( getID(), effective_heal );
     }
 }
 
@@ -9199,11 +9213,11 @@ void Character::hurtall( int dam, Creature *source, bool disturb /*= true*/ )
         return;
     }
 
-    for( const bodypart_id &bp : get_all_body_parts() ) {
+    for( const bodypart_id &bp : get_all_body_parts( true ) ) {
         // Don't use apply_damage here or it will annoy the player with 6 queries
         const int dam_to_bodypart = std::min( dam, get_part_hp_cur( bp ) );
         mod_part_hp_cur( bp, - dam_to_bodypart );
-        g->events().send<event_type::character_takes_damage>( getID(), dam_to_bodypart );
+        get_event_bus().send<event_type::character_takes_damage>( getID(), dam_to_bodypart );
     }
 
     // Low pain: damage is spread all over the body, so not as painful as 6 hits in one part
@@ -10410,7 +10424,7 @@ int Character::heartrate_bpm() const
         average_heartbeat *= 1.1;
     }
     //COLDBLOOD dependencies, works almost same way as temperature effect for speed.
-    const int player_local_temp = g->weather.get_temperature( pos() );
+    const int player_local_temp = get_weather().get_temperature( pos() );
     float temperature_modifier = 0;
     if( has_trait( trait_COLDBLOOD ) ) {
         temperature_modifier = 0.002;
