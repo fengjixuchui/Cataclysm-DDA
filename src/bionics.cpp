@@ -202,7 +202,6 @@ static const std::string flag_NO_STERILE( "NO_STERILE" );
 static const std::string flag_NO_UNWIELD( "NO_UNWIELD" );
 static const std::string flag_PERPETUAL( "PERPETUAL" );
 static const std::string flag_PERSONAL( "PERSONAL" );
-static const std::string flag_SAFE_FUEL_OFF( "SAFE_FUEL_OFF" );
 static const std::string flag_SEALED( "SEALED" );
 static const std::string flag_SEMITANGIBLE( "SEMITANGIBLE" );
 
@@ -1318,7 +1317,7 @@ bool Character::burn_fuel( int b, bool start )
                 current_fuel_stock = std::stoi( get_value( fuel.str() ) );
             }
 
-            if( !bio.has_flag( flag_SAFE_FUEL_OFF ) &&
+            if( bio.get_safe_fuel_thresh() > 0 &&
                 ( ( get_power_level() + units::from_kilojoule( fuel_energy ) * effective_efficiency >
                     get_max_power_level() ) ||
                   ( ( ( get_power_level() + units::from_kilojoule( fuel_energy ) * effective_efficiency ) >
@@ -2293,7 +2292,7 @@ void Character::perform_uninstall( const bionic_id &bid, int difficulty, int suc
         bionics_uninstall_failure( difficulty, success, adjusted_skill );
 
     }
-    here.invalidate_map_cache( g->get_levz() );
+    here.invalidate_map_cache( here.get_abs_sub().z );
 }
 
 bool Character::uninstall_bionic( const bionic &target_cbm, monster &installer, player &patient,
@@ -2540,7 +2539,8 @@ void Character::perform_install( const bionic_id &bid, const bionic_id &upbid, i
                                ( 10.0 ) );
         bionics_install_failure( bid, installer_name, difficulty, success, adjusted_skill, patient_pos );
     }
-    get_map().invalidate_map_cache( g->get_levz() );
+    map &here = get_map();
+    here.invalidate_map_cache( here.get_abs_sub().z );
 }
 
 void Character::bionics_install_failure( const bionic_id &bid, const std::string &installer,
@@ -2601,7 +2601,7 @@ void Character::bionics_install_failure( const bionic_id &bid, const std::string
                         set_max_power_level( units::from_kilojoule( rng( 0,
                                              units::to_kilojoule( get_max_power_level() ) - 25 ) ) );
                         if( is_player() ) {
-                            g->memorial().add(
+                            get_memorial().add(
                                 pgettext( "memorial_male", "Lost %d units of power capacity." ),
                                 pgettext( "memorial_female", "Lost %d units of power capacity." ),
                                 units::to_kilojoule( old_power - get_max_power_level() ) );
@@ -2879,13 +2879,7 @@ bool bionic::is_this_fuel_powered( const itype_id &this_fuel ) const
 
 void bionic::toggle_safe_fuel_mod()
 {
-    if( info().fuel_opts.empty() && !info().is_remote_fueled ) {
-        return;
-    }
-    if( !has_flag( flag_SAFE_FUEL_OFF ) ) {
-        set_flag( flag_SAFE_FUEL_OFF );
-        set_safe_fuel_thresh( 2.0 );
-    } else {
+    if( !info().fuel_opts.empty() || info().is_remote_fueled ) {
         uilist tmenu;
         tmenu.text = _( "Chose Safe Fuel Level Threshold" );
         tmenu.addentry( 1, true, 'o', _( "Full Power" ) );
@@ -2898,25 +2892,24 @@ void bionic::toggle_safe_fuel_mod()
         if( get_auto_start_thresh() < 0.30 ) {
             tmenu.addentry( 4, true, 's', _( "Above 30 %%" ) );
         }
+        tmenu.addentry( 5, true, 'd', _( "Disabled" ) );
         tmenu.query();
 
         switch( tmenu.ret ) {
             case 1:
-                remove_flag( flag_SAFE_FUEL_OFF );
-                set_safe_fuel_thresh( 1.0 );
+                set_safe_fuel_thresh( 1.0f );
                 break;
             case 2:
-                remove_flag( flag_SAFE_FUEL_OFF );
-                set_safe_fuel_thresh( 0.80 );
+                set_safe_fuel_thresh( 0.80f );
                 break;
             case 3:
-                remove_flag( flag_SAFE_FUEL_OFF );
-                set_safe_fuel_thresh( 0.55 );
+                set_safe_fuel_thresh( 0.55f );
                 break;
             case 4:
-                remove_flag( flag_SAFE_FUEL_OFF );
-                set_safe_fuel_thresh( 0.30 );
+                set_safe_fuel_thresh( 0.30f );
                 break;
+            case 5:
+                set_safe_fuel_thresh( -1.0f );
             default:
                 break;
         }
@@ -3111,7 +3104,7 @@ void Character::introduce_into_anesthesia( const time_duration &duration, player
 
     if( has_effect( effect_narcosis ) ) {
         const time_duration remaining_time = get_effect_dur( effect_narcosis );
-        if( remaining_time <= duration ) {
+        if( remaining_time < duration ) {
             const time_duration top_off_time = duration - remaining_time;
             add_effect( effect_narcosis, top_off_time );
             fall_asleep( top_off_time );

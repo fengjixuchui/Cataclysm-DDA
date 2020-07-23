@@ -293,7 +293,7 @@ void player::normalize()
 
     recalc_hp();
 
-    temp_conv.fill( BODYTEMP_NORM );
+    set_all_parts_temp_conv( BODYTEMP_NORM );
     set_stamina( get_stamina_max() );
 }
 
@@ -400,8 +400,8 @@ void player::process_turn()
     if( !is_npc() && ( has_trait( trait_NOMAD ) || has_trait( trait_NOMAD2 ) ||
                        has_trait( trait_NOMAD3 ) ) &&
         !has_effect( effect_sleep ) && !has_effect( effect_narcosis ) ) {
-        const tripoint ompos = global_omt_location();
-        const point pos = ompos.xy();
+        const tripoint_abs_omt ompos = global_omt_location();
+        const point_abs_omt pos = ompos.xy();
         if( overmap_time.find( pos ) == overmap_time.end() ) {
             overmap_time[pos] = 1_turns;
         } else {
@@ -410,7 +410,7 @@ void player::process_turn()
     }
     // Decay time spent in other overmap tiles.
     if( !is_npc() && calendar::once_every( 1_hours ) ) {
-        const tripoint ompos = global_omt_location();
+        const tripoint_abs_omt ompos = global_omt_location();
         const time_point now = calendar::turn;
         time_duration decay_time = 0_days;
         if( has_trait( trait_NOMAD ) ) {
@@ -422,12 +422,12 @@ void player::process_turn()
         }
         auto it = overmap_time.begin();
         while( it != overmap_time.end() ) {
-            if( it->first.x == ompos.x && it->first.y == ompos.y ) {
+            if( it->first == ompos.xy() ) {
                 it++;
                 continue;
             }
             // Find the amount of time passed since the player touched any of the overmap tile's submaps.
-            const tripoint tpt = tripoint( it->first, 0 );
+            const tripoint_abs_omt tpt( it->first, 0 );
             const time_point last_touched = overmap_buffer.scent_at( tpt ).creation_time;
             const time_duration since_visit = now - last_touched;
             // If the player has spent little time in this overmap tile, let it decay after just an hour instead of the usual extended decay time.
@@ -1752,21 +1752,22 @@ void player::update_body_wetness( const w_point &weather )
     // To make drying uniform, make just one roll and reuse it
     const int drying_roll = rng( 1, 80 );
 
-    for( const body_part bp : all_body_parts ) {
-        if( body_wetness[bp] == 0 ) {
+    for( const bodypart_id &bp : get_all_body_parts() ) {
+        if( get_part_wetness( bp ) == 0 ) {
             continue;
         }
         // This is to normalize drying times
-        int drying_chance = drench_capacity[bp];
+        int drying_chance = get_part_drench_capacity( bp );
+        const int temp_conv = get_part_temp_conv( bp );
         // Body temperature affects duration of wetness
         // Note: Using temp_conv rather than temp_cur, to better approximate environment
-        if( temp_conv[bp] >= BODYTEMP_SCORCHING ) {
+        if( temp_conv >= BODYTEMP_SCORCHING ) {
             drying_chance *= 2;
-        } else if( temp_conv[bp] >= BODYTEMP_VERY_HOT ) {
+        } else if( temp_conv >= BODYTEMP_VERY_HOT ) {
             drying_chance = drying_chance * 3 / 2;
-        } else if( temp_conv[bp] >= BODYTEMP_HOT ) {
+        } else if( temp_conv >= BODYTEMP_HOT ) {
             drying_chance = drying_chance * 4 / 3;
-        } else if( temp_conv[bp] > BODYTEMP_COLD ) {
+        } else if( temp_conv > BODYTEMP_COLD ) {
             // Comfortable, doesn't need any changes
         } else {
             // Evaporation doesn't change that much at lower temp
@@ -1779,9 +1780,9 @@ void player::update_body_wetness( const w_point &weather )
 
         // TODO: Make evaporation reduce body heat
         if( drying_chance >= drying_roll ) {
-            body_wetness[bp] -= 1;
-            if( body_wetness[bp] < 0 ) {
-                body_wetness[bp] = 0;
+            mod_part_wetness( bp, 1 );
+            if( get_part_wetness( bp ) < 0 ) {
+                set_part_wetness( bp, 0 );
             }
         }
     }
