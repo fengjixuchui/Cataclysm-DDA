@@ -753,7 +753,8 @@ class item : public visitable<item>
          * returns this. It's intended to be used like \code newitem = newitem.in_its_container();\endcode
          */
         item in_its_container( int qty = INFINITE_CHARGES ) const;
-        item in_container( const itype_id &container_type, int qty = INFINITE_CHARGES ) const;
+        item in_container( const itype_id &container_type, int qty = INFINITE_CHARGES,
+                           bool sealed = true ) const;
 
         bool item_has_uses_recursive() const;
 
@@ -1321,6 +1322,12 @@ class item : public visitable<item>
          * vector but will be removed immediately after the function returns
          */
         void on_takeoff( Character &p );
+
+        /**
+         * Calculate (but do not deduct) the number of moves required to wield this weapon
+         */
+        int on_wield_cost( const player &p ) const;
+
         /**
          * Callback when a player starts wielding the item. The item is already in the weapon
          * slot and is called from there.
@@ -1365,6 +1372,7 @@ class item : public visitable<item>
          * For items not counted by charges, this returns vol / this->volume().
          */
         int charges_per_volume( const units::volume &vol ) const;
+        int charges_per_weight( const units::mass &m ) const;
 
         /**
          * @name Item variables

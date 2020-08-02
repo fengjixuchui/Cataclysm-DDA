@@ -13,6 +13,7 @@
 #include "anatomy.h"
 #include "bodypart.h"
 #include "damage.h"
+#include "location.h"
 #include "pimpl.h"
 #include "string_formatter.h"
 #include "translations.h"
@@ -196,10 +197,10 @@ enum class FacingDirection : int {
     RIGHT = 2
 };
 
-class Creature
+class Creature : public location
 {
     public:
-        virtual ~Creature();
+        ~Creature() override;
 
         static const std::map<std::string, creature_size> size_map;
 
@@ -462,45 +463,47 @@ class Creature
          */
         void check_dead_state();
 
-        virtual int posx() const = 0;
-        virtual int posy() const = 0;
-        virtual int posz() const = 0;
-        virtual const tripoint &pos() const = 0;
-
-        virtual void setpos( const tripoint &pos ) = 0;
-
         /** Processes move stopping effects. Returns false if movement is stopped. */
         virtual bool move_effects( bool attacking ) = 0;
 
         void add_effect( const effect &eff, bool force = false, bool deferred = false );
         /** Adds or modifies an effect. If intensity is given it will set the effect intensity
             to the given value, or as close as max_intensity values permit. */
-        virtual void add_effect( const efftype_id &eff_id, const time_duration &dur, body_part bp = num_bp,
-                                 bool permanent = false, int intensity = 0, bool force = false, bool deferred = false );
+        void add_effect( const efftype_id &eff_id, const time_duration &dur, bodypart_id bp,
+                         bool permanent = false, int intensity = 0, bool force = false, bool deferred = false );
+        void add_effect( const efftype_id &eff_id, const time_duration &dur, bool permanent = false,
+                         int intensity = 0, bool force = false, bool deferred = false );
         /** Gives chance to save via environmental resist, returns false if resistance was successful. */
-        bool add_env_effect( const efftype_id &eff_id, body_part vector, int strength,
-                             const time_duration &dur,
-                             body_part bp = num_bp, bool permanent = false, int intensity = 1,
+        bool add_env_effect( const efftype_id &eff_id, const bodypart_id &vector, int strength,
+                             const time_duration &dur, const bodypart_id &bp, bool permanent = false, int intensity = 1,
                              bool force = false );
-        /** Removes a listed effect. bp = num_bp means to remove all effects of
+        bool add_env_effect( const efftype_id &eff_id, const bodypart_id &vector, int strength,
+                             const time_duration &dur, bool permanent = false, int intensity = 1, bool force = false );
+        /** Removes a listed effect. If the bodypart is not specified remove all effects of
          * a given type, targeted or untargeted. Returns true if anything was
          * removed. */
-        virtual bool remove_effect( const efftype_id &eff_id, body_part bp = num_bp );
+        bool remove_effect( const efftype_id &eff_id, const bodypart_id &bp );
+        bool remove_effect( const efftype_id &eff_id );
         /** Remove all effects. */
         void clear_effects();
-        /** Check if creature has the matching effect. bp = num_bp means to check if the Creature has any effect
+        /** Check if creature has the matching effect. If the bodypart is not specified check if the Creature has any effect
          *  of the matching type, targeted or untargeted. */
-        bool has_effect( const efftype_id &eff_id, body_part bp = num_bp ) const;
+        bool has_effect( const efftype_id &eff_id, const bodypart_str_id &bp ) const;
+        bool has_effect( const efftype_id &eff_id ) const;
         /** Check if creature has any effect with the given flag. */
-        bool has_effect_with_flag( const std::string &flag, body_part bp = num_bp ) const;
+        bool has_effect_with_flag( const std::string &flag, const bodypart_id &bp ) const;
+        bool has_effect_with_flag( const std::string &flag ) const;
         std::vector<effect> get_effects_with_flag( const std::string &flag ) const;
         /** Return the effect that matches the given arguments exactly. */
-        const effect &get_effect( const efftype_id &eff_id, body_part bp = num_bp ) const;
-        effect &get_effect( const efftype_id &eff_id, body_part bp = num_bp );
+        const effect &get_effect( const efftype_id &eff_id,
+                                  const bodypart_id &bp = bodypart_id( "bp_null" ) ) const;
+        effect &get_effect( const efftype_id &eff_id, const bodypart_id &bp = bodypart_id( "bp_null" ) );
         /** Returns the duration of the matching effect. Returns 0 if effect doesn't exist. */
-        time_duration get_effect_dur( const efftype_id &eff_id, body_part bp = num_bp ) const;
+        time_duration get_effect_dur( const efftype_id &eff_id,
+                                      const bodypart_id &bp = bodypart_id( "bp_null" ) ) const;
         /** Returns the intensity of the matching effect. Returns 0 if effect doesn't exist. */
-        int get_effect_int( const efftype_id &eff_id, body_part bp = num_bp ) const;
+        int get_effect_int( const efftype_id &eff_id,
+                            const bodypart_id &bp = bodypart_id( "bp_null" ) ) const;
         /** Returns true if the creature resists an effect */
         bool resists_effect( const effect &e );
 
@@ -1001,7 +1004,7 @@ class Creature
 
     protected:
         virtual void on_stat_change( const std::string &, int ) {}
-        virtual void on_effect_int_change( const efftype_id &, int, body_part ) {}
+        virtual void on_effect_int_change( const efftype_id &, int, const bodypart_id & ) {}
         virtual void on_damage_of_type( int, damage_type, const bodypart_id & ) {}
 
     public:

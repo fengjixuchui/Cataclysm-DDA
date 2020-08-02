@@ -114,7 +114,7 @@ void glare( weather_type_id w )
         if( player_character.has_trait( trait_CEPH_VISION ) ) {
             dur = dur * 2;
         }
-        player_character.add_env_effect( *effect, bp_eyes, 2, dur );
+        player_character.add_env_effect( *effect, bodypart_id( "eyes" ), 2, dur );
     }
 }
 
@@ -149,7 +149,6 @@ inline void proc_weather_sum( const weather_type_id wtype, weather_sum &data,
     } else {
         data.rain_amount += amount;
     }
-
 
     // TODO: Change this sunlight "sampling" here into a proper interpolation
     const float tick_sunlight = incident_sunlight( wtype, t );
@@ -379,7 +378,7 @@ static void fill_funnels( int rain_depth_mm_per_hour, bool acid, const trap &tr 
  */
 static void fill_water_collectors( int mmPerHour, bool acid )
 {
-    for( auto &e : trap::get_funnels() ) {
+    for( const auto &e : trap::get_funnels() ) {
         fill_funnels( mmPerHour, acid, *e );
     }
 }
@@ -399,6 +398,7 @@ static void fill_water_collectors( int mmPerHour, bool acid )
 void wet( Character &target, int amount )
 {
     if( !is_creature_outside( target ) ||
+        amount <= 0 ||
         target.has_trait( trait_FEATHERS ) ||
         target.weapon.has_flag( "RAIN_PROTECT" ) ||
         ( !one_in( 50 ) && target.worn_with_flag( "RAINPROOF" ) ) ) {
@@ -482,7 +482,6 @@ void handle_weather_effects( weather_type_id const w )
     }
     glare( w );
     g->weather.lightning_active = false;
-
 
     for( const weather_effect &current_effect : w->effects ) {
         if( current_effect.must_be_outside && !is_creature_outside( player_character ) ) {
@@ -575,7 +574,7 @@ void handle_weather_effects( weather_type_id const w )
         if( current_effect.effect_id.is_valid() ) {
             if( current_effect.target_part.is_valid() ) {
                 player_character.add_effect( current_effect.effect_id, current_effect.effect_duration,
-                                             current_effect.target_part->token );
+                                             current_effect.target_part );
             } else {
                 player_character.add_effect( current_effect.effect_id, current_effect.effect_duration );
             }
@@ -586,13 +585,14 @@ void handle_weather_effects( weather_type_id const w )
         if( current_effect.trait_id_to_remove.is_valid() ) {
             player_character.unset_mutation( current_effect.trait_id_to_remove );
         }
-
-        if( current_effect.target_part.is_valid() ) {
-            player_character.deal_damage( nullptr, current_effect.target_part, damage_instance( DT_BASH,
-                                          current_effect.damage ) );
-        } else {
-            for( const bodypart_id &bp : player_character.get_all_body_parts() ) {
-                player_character.deal_damage( nullptr, bp, damage_instance( DT_BASH, current_effect.damage ) );
+        if( current_effect.damage != 0 ) {
+            if( current_effect.target_part.is_valid() ) {
+                player_character.deal_damage( nullptr, current_effect.target_part, damage_instance( DT_BASH,
+                                              current_effect.damage ) );
+            } else {
+                for( const bodypart_id &bp : player_character.get_all_body_parts() ) {
+                    player_character.deal_damage( nullptr, bp, damage_instance( DT_BASH, current_effect.damage ) );
+                }
             }
         }
         player_character.mod_healthy( current_effect.healthy );

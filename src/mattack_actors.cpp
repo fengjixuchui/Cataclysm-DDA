@@ -32,6 +32,7 @@ static const efftype_id effect_grabbed( "grabbed" );
 static const efftype_id effect_infected( "infected" );
 static const efftype_id effect_laserlocked( "laserlocked" );
 static const efftype_id effect_poison( "poison" );
+static const efftype_id effect_stunned( "stunned" );
 static const efftype_id effect_targeted( "targeted" );
 static const efftype_id effect_was_laserlocked( "was_laserlocked" );
 
@@ -337,7 +338,7 @@ void melee_actor::on_damage( monster &z, Creature &target, dealt_damage_instance
 
     for( const auto &eff : effects ) {
         if( x_in_y( eff.chance, 100 ) ) {
-            const body_part affected_bp = eff.affect_hit_bp ? bp->token : eff.bp;
+            const bodypart_id affected_bp = eff.affect_hit_bp ? bp : convert_bp( eff.bp ).id();
             target.add_effect( eff.id, time_duration::from_turns( eff.duration ), affected_bp, eff.permanent );
         }
     }
@@ -361,12 +362,12 @@ void bite_actor::on_damage( monster &z, Creature &target, dealt_damage_instance 
     melee_actor::on_damage( z, target, dealt );
     if( target.has_effect( effect_grabbed ) && one_in( no_infection_chance - dealt.total_damage() ) ) {
         const bodypart_id &hit = dealt.bp_hit;
-        if( target.has_effect( effect_bite, hit->token ) ) {
-            target.add_effect( effect_bite, 40_minutes, hit->token, true );
-        } else if( target.has_effect( effect_infected, hit->token ) ) {
-            target.add_effect( effect_infected, 25_minutes, hit->token, true );
+        if( target.has_effect( effect_bite, hit.id() ) ) {
+            target.add_effect( effect_bite, 40_minutes, hit, true );
+        } else if( target.has_effect( effect_infected, hit.id() ) ) {
+            target.add_effect( effect_infected, 25_minutes, hit, true );
         } else {
-            target.add_effect( effect_bite, 1_turns, hit->token, true );
+            target.add_effect( effect_bite, 1_turns, hit, true );
         }
     }
     if( target.has_trait( trait_TOXICFLESH ) ) {
@@ -546,6 +547,10 @@ void gun_actor::shoot( monster &z, Creature &target, const gun_mode_id &mode ) c
             mag.ammo_set( ammo, z.ammo[ammo] );
             gun.put_in( mag, item_pocket::pocket_type::MAGAZINE_WELL );
         }
+    }
+
+    if( z.has_effect( effect_stunned ) ) {
+        return;
     }
 
     if( !gun.ammo_sufficient() ) {

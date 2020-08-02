@@ -882,7 +882,7 @@ static void draw_limb_health( avatar &u, const catacurses::window &w, bodypart_i
 
         if( u.worn_with_flag( "SPLINT",  bp ) ) {
             static const efftype_id effect_mending( "mending" );
-            const auto &eff = u.get_effect( effect_mending, bp->token );
+            const auto &eff = u.get_effect( effect_mending, bp );
             const int mend_perc = eff.is_null() ? 0.0 : 100 * eff.get_duration() / eff.get_max_duration();
 
             if( is_self_aware || u.has_effect( effect_got_checked ) ) {
@@ -2347,7 +2347,8 @@ void panel_manager::show_adm()
         }
 
         const size_t num_rows = current_col == 0 ? row_indices.size() : layouts.size();
-        current_row = clamp<size_t>( current_row, 0, num_rows - 1 );
+        current_row = static_cast<size_t>( clamp( static_cast<int>( current_row ), 0,
+                                           static_cast<int>( num_rows - 1 ) ) );
 
         ui_manager::redraw();
 

@@ -201,7 +201,7 @@ void spawn_animal( npc &p, const mtype_id &mon )
 {
     if( monster *const mon_ptr = g->place_critter_around( mon, p.pos(), 1 ) ) {
         mon_ptr->friendly = -1;
-        mon_ptr->add_effect( effect_pet, 1_turns, num_bp, true );
+        mon_ptr->add_effect( effect_pet, 1_turns, true );
     } else {
         // TODO: handle this gracefully (return the money, proper in-character message from npc)
         add_msg( m_debug, "No space to spawn purchased pet" );
@@ -315,7 +315,7 @@ void talk_function::goto_location( npc &p )
         basecamp *temp_camp = *camp;
         camps.push_back( temp_camp );
     }
-    for( auto iter : camps ) {
+    for( const basecamp *iter : camps ) {
         //~ %1$s: camp name, %2$d and %3$d: coordinates
         selection_menu.addentry( i++, true, MENU_AUTOASSIGN, pgettext( "camp", "%1$s at %2$s" ),
                                  iter->camp_name(), iter->camp_omt_pos().to_string() );
@@ -332,7 +332,7 @@ void talk_function::goto_location( npc &p )
     if( index == static_cast<int>( camps.size() ) ) {
         destination = player_character.global_omt_location();
     } else {
-        auto selected_camp = camps[index];
+        const basecamp *selected_camp = camps[index];
         destination = selected_camp->camp_omt_pos();
     }
     p.goal = destination;
@@ -564,14 +564,14 @@ void talk_function::give_aid( npc &p )
     Character &player_character = get_player_character();
     for( const bodypart_id &bp : player_character.get_all_body_parts( true ) ) {
         player_character.heal( bp, 5 * rng( 2, 5 ) );
-        if( player_character.has_effect( effect_bite, bp->token ) ) {
-            player_character.remove_effect( effect_bite, bp->token );
+        if( player_character.has_effect( effect_bite, bp.id() ) ) {
+            player_character.remove_effect( effect_bite, bp );
         }
-        if( player_character.has_effect( effect_bleed, bp->token ) ) {
-            player_character.remove_effect( effect_bleed, bp->token );
+        if( player_character.has_effect( effect_bleed, bp.id() ) ) {
+            player_character.remove_effect( effect_bleed, bp );
         }
-        if( player_character.has_effect( effect_infected, bp->token ) ) {
-            player_character.remove_effect( effect_infected, bp->token );
+        if( player_character.has_effect( effect_infected, bp.id() ) ) {
+            player_character.remove_effect( effect_infected, bp );
         }
     }
     const int moves = to_moves<int>( 100_minutes );
@@ -587,14 +587,14 @@ void talk_function::give_all_aid( npc &p )
         if( guy.is_walking_with() && rl_dist( guy.pos(), get_player_character().pos() ) < PICKUP_RANGE ) {
             for( const bodypart_id &bp : guy.get_all_body_parts( true ) ) {
                 guy.heal( bp, 5 * rng( 2, 5 ) );
-                if( guy.has_effect( effect_bite, bp->token ) ) {
-                    guy.remove_effect( effect_bite, bp->token );
+                if( guy.has_effect( effect_bite, bp.id() ) ) {
+                    guy.remove_effect( effect_bite, bp );
                 }
-                if( guy.has_effect( effect_bleed, bp->token ) ) {
-                    guy.remove_effect( effect_bleed, bp->token );
+                if( guy.has_effect( effect_bleed, bp.id() ) ) {
+                    guy.remove_effect( effect_bleed, bp );
                 }
-                if( guy.has_effect( effect_infected, bp->token ) ) {
-                    guy.remove_effect( effect_infected, bp->token );
+                if( guy.has_effect( effect_infected, bp.id() ) ) {
+                    guy.remove_effect( effect_infected, bp );
                 }
             }
         }
@@ -896,10 +896,10 @@ void talk_function::player_weapon_drop( npc &/*p*/ )
 
 void talk_function::lead_to_safety( npc &p )
 {
-    const auto mission = mission::reserve_new( mission_type_id( "MISSION_REACH_SAFETY" ),
-                         character_id() );
-    mission->assign( get_avatar() );
-    p.goal = mission->get_target();
+    mission *reach_safety__mission = mission::reserve_new( mission_type_id( "MISSION_REACH_SAFETY" ),
+                                     character_id() );
+    reach_safety__mission->assign( get_avatar() );
+    p.goal = reach_safety__mission->get_target();
     p.set_attitude( NPCATT_LEAD );
 }
 

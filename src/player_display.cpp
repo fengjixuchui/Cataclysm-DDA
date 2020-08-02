@@ -1249,7 +1249,7 @@ void player::disp_info()
 
     std::vector<HeaderSkill> skillslist;
     skill_displayType_id prev_type = skill_displayType_id::NULL_ID();
-    for( auto &s : player_skill ) {
+    for( const auto &s : player_skill ) {
         if( s->display_category() != prev_type ) {
             prev_type = s->display_category();
             skillslist.emplace_back( s, true );
@@ -1314,7 +1314,7 @@ void player::disp_info()
 
     std::map<std::string, int> speed_effects;
     for( auto &elem : *effects ) {
-        for( std::pair<const body_part, effect> &_effect_it : elem.second ) {
+        for( std::pair<const bodypart_str_id, effect> &_effect_it : elem.second ) {
             effect &it = _effect_it.second;
             bool reduced = resists_effect( it );
             int move_adjust = it.get_mod( "SPEED", reduced );
