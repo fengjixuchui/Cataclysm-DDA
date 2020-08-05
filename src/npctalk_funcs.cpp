@@ -921,6 +921,7 @@ void talk_function::start_training( npc &p )
     const skill_id &skill = p.chatbin.skill;
     const matype_id &style = p.chatbin.style;
     const spell_id &sp_id = p.chatbin.dialogue_spell;
+    const proficiency_id &proficiency = p.chatbin.proficiency;
     int expert_multiplier = 1;
     Character &you = get_player_character();
     if( skill != skill_id() &&
@@ -929,19 +930,19 @@ void talk_function::start_training( npc &p )
         time = calc_skill_training_time( p, skill );
         name = skill.str();
     } else if( p.chatbin.style != matype_id() &&
-               !you.martial_arts_data.has_martialart( style ) ) {
+               !you.martial_arts_data->has_martialart( style ) ) {
         cost = calc_ma_style_training_cost( p, style );
         time = calc_ma_style_training_time( p, style );
         name = p.chatbin.style.str();
         // already checked if can learn this spell in npctalk.cpp
     } else if( p.chatbin.dialogue_spell != spell_id() ) {
-        const spell &temp_spell = p.magic.get_spell( sp_id );
-        const bool knows = you.magic.knows_spell( sp_id );
+        const spell &temp_spell = p.magic->get_spell( sp_id );
+        const bool knows = you.magic->knows_spell( sp_id );
         cost = p.calc_spell_training_cost( knows, temp_spell.get_difficulty(),
                                            temp_spell.get_level() );
         name = temp_spell.id().str();
         expert_multiplier = knows ? temp_spell.get_level() -
-                            you.magic.get_spell( sp_id ).get_level() : 1;
+                            you.magic->get_spell( sp_id ).get_level() : 1;
         // quicker to learn with instruction as opposed to books.
         // if this is a known spell, then there is a set time to gain some exp.
         // if player doesn't know this spell, then the NPC will teach all of it
@@ -951,9 +952,14 @@ void talk_function::start_training( npc &p )
         if( knows ) {
             time = 1_hours;
         } else {
-            const int time_int = you.magic.time_to_learn_spell( you, sp_id ) / 50;
+            const int time_int = you.magic->time_to_learn_spell( you, sp_id ) / 50;
             time = time_duration::from_seconds( clamp( time_int, 7200, 21600 ) );
         }
+
+    } else if( proficiency != proficiency_id() ) {
+        name = proficiency.str();
+        cost = calc_proficiency_training_cost( p, proficiency );
+        time = calc_proficiency_training_time( p, proficiency );
     } else {
         debugmsg( "start_training with no valid skill or style set" );
         return;
@@ -980,7 +986,7 @@ npc *pick_follower()
     std::vector<tripoint> locations;
 
     for( npc &guy : g->all_npcs() ) {
-        if( guy.is_player_ally() && get_player_character().sees( guy ) ) {
+        if( guy.is_player_ally() && get_player_view().sees( guy ) ) {
             followers.push_back( &guy );
             locations.push_back( guy.pos() );
         }

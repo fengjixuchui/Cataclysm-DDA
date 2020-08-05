@@ -18,26 +18,17 @@
 #include <utility>
 #include <vector>
 
-#include "bodypart.h"
 #include "calendar.h"
 #include "cata_utility.h"
 #include "character_id.h"
-#include "character_martial_arts.h"
-#include "color.h"
 #include "coordinates.h"
 #include "creature.h"
 #include "damage.h"
 #include "enums.h"
 #include "flat_set.h"
 #include "game_constants.h"
-#include "inventory.h"
-#include "item.h"
 #include "item_location.h"
-#include "magic.h"
-#include "magic_enchantment.h"
 #include "memory_fast.h"
-#include "monster.h"
-#include "mtype.h"
 #include "optional.h"
 #include "pimpl.h"
 #include "player_activity.h"
@@ -50,32 +41,43 @@
 #include "units.h"
 #include "visitable.h"
 #include "weighted_list.h"
-#include "weather_gen.h"
 
+class basecamp;
+class bionic_collection;
+class character_martial_arts;
+class faction;
 class JsonIn;
 class JsonObject;
 class JsonOut;
-class SkillLevel;
-class SkillLevelMap;
-class basecamp;
-class bionic_collection;
-class faction;
+class known_magic;
+class monster;
+class nc_color;
+class npc;
 class player;
 class player_morale;
+class proficiency_set;
+class recipe_subset;
+class SkillLevel;
+class SkillLevelMap;
 class vehicle;
+
 struct bionic;
 struct construction;
 struct dealt_projectile_attack;
+struct display_proficiency;
 /// @brief Item slot used to apply modifications from food and meds
 struct islot_comestible;
 struct itype;
-class recipe_subset;
 struct mutation_branch;
 struct needs_rates;
 struct pathfinding_settings;
 struct points_left;
+struct w_point;
+
 template <typename E> struct enum_traits;
+
 enum npc_attitude : int;
+enum action_id : int;
 
 static const std::string DEFAULT_HOTKEYS( "1234567890abcdefghijklmnopqrstuvwxyz" );
 
@@ -1000,9 +1002,7 @@ class Character : public Creature, public visitable<Character>
         /** Returns true if the player has any martial arts buffs attached */
         bool has_mabuff( const mabuff_id &buff_id ) const;
         /** Returns true if the player has a grab breaking technique available */
-        bool has_grab_break_tec() const override {
-            return martial_arts_data.has_grab_break_tec();
-        }
+        bool has_grab_break_tec() const override;
 
         /** Returns the to hit bonus from martial arts buffs */
         float mabuff_tohit_bonus() const;
@@ -1603,11 +1603,16 @@ class Character : public Creature, public visitable<Character>
         int intimidation() const;
 
         // --------------- Proficiency Stuff ----------------
-        // (bit short at the moment)
         bool has_proficiency( const proficiency_id &prof ) const;
         void add_proficiency( const proficiency_id &prof );
         void lose_proficiency( const proficiency_id &prof );
-        const std::set<proficiency_id> &proficiencies() const;
+        void practice_proficiency( const proficiency_id &prof, time_duration amount,
+                                   cata::optional<time_duration> max = cata::nullopt );
+        time_duration proficiency_training_needed( const proficiency_id &prof ) const;
+        std::vector<display_proficiency> display_proficiencies() const;
+        std::vector<proficiency_id> known_proficiencies() const;
+        std::vector<proficiency_id> learning_proficiencies() const;
+
 
         // --------------- Other Stuff ---------------
 
@@ -1622,7 +1627,7 @@ class Character : public Creature, public visitable<Character>
             }
         }
         // magic mod
-        known_magic magic;
+        pimpl<known_magic> magic;
 
         void make_bleed( const bodypart_id &bp, time_duration duration, int intensity = 1,
                          bool permanent = false,
@@ -1733,13 +1738,13 @@ class Character : public Creature, public visitable<Character>
         player_activity activity;
         std::list<player_activity> backlog;
         cata::optional<tripoint> destination_point;
-        inventory inv;
+        pimpl<inventory> inv;
         itype_id last_item;
         item weapon;
 
         int scent = 0;
         pimpl<bionic_collection> my_bionics;
-        character_martial_arts martial_arts_data;
+        pimpl<character_martial_arts> martial_arts_data;
 
         stomach_contents stomach;
         stomach_contents guts;
@@ -2107,9 +2112,9 @@ class Character : public Creature, public visitable<Character>
         * Recharge CBMs whenever possible.
         * @return true when recharging was successful.
         */
-        bool feed_reactor_with( item &it );
-        bool feed_furnace_with( item &it );
-        bool fuel_bionic_with( item &it );
+        bool feed_reactor_with( item &it, item_pocket *parent_pocket );
+        bool feed_furnace_with( item &it, item_pocket *parent_pocket );
+        bool fuel_bionic_with( item &it, item_pocket *parent_pocket );
         /** Used to apply stimulation modifications from food and medication **/
         void modify_stimulation( const islot_comestible &comest );
         /** Used to apply fatigue modifications from food and medication **/
@@ -2315,6 +2320,12 @@ class Character : public Creature, public visitable<Character>
          */
         void craft_skill_gain( const item &craft, const int &multiplier );
         /**
+         * Handle proficiency practice for player and followers while crafting
+         * @param craft - the in progress craft
+         * @param time - the amount of time since the last practice tick
+         */
+        void craft_proficiency_gain( const item &craft, time_duration time );
+        /**
          * Check if the player can disassemble an item using the current crafting inventory
          * @param obj Object to check for disassembly
          * @param inv current crafting inventory
@@ -2495,7 +2506,7 @@ class Character : public Creature, public visitable<Character>
         // --------------- Values ---------------
         pimpl<SkillLevelMap> _skills;
 
-        std::set<proficiency_id> _proficiencies;
+        pimpl<proficiency_set> _proficiencies;
 
         // Cached vision values.
         std::bitset<NUM_VISION_MODES> vision_mode_cache;
@@ -2557,7 +2568,7 @@ class Character : public Creature, public visitable<Character>
 
         // a cache of all active enchantment values.
         // is recalculated every turn in Character::recalculate_enchantment_cache
-        enchantment enchantment_cache;
+        pimpl<enchantment> enchantment_cache;
         player_activity destination_activity;
         /// A unique ID number, assigned by the game class. Values should never be reused.
         character_id id;
@@ -2591,7 +2602,7 @@ class Character : public Creature, public visitable<Character>
 
         int cached_moves;
         tripoint cached_position;
-        inventory cached_crafting_inventory;
+        pimpl<inventory> cached_crafting_inventory;
 
     protected:
         /** Subset of learned recipes. Needs to be mutable for lazy initialization. */
