@@ -17,11 +17,14 @@
 #include <utility>
 
 #include "activity_handlers.h"
+#include "activity_type.h"
 #include "avatar.h"
 #include "calendar.h"
 #include "cata_utility.h"
 #include "catacharset.h"
+#include "character.h"
 #include "character_id.h"
+#include "colony.h"
 #include "debug.h"
 #include "enums.h"
 #include "faction.h"
@@ -32,10 +35,10 @@
 #include "handle_liquid.h"
 #include "item.h"
 #include "item_contents.h"
+#include "item_group.h"
 #include "itype.h"
 #include "map.h"
 #include "map_selector.h"
-#include "math_defines.h"
 #include "memory_fast.h"
 #include "messages.h"
 #include "monster.h"
@@ -3085,7 +3088,7 @@ void veh_interact::complete_vehicle( player &p )
             struct vehicle_part &pt = veh->part( vehicle_part );
             if( pt.is_tank() && src->is_container() && !src->contents.empty() ) {
                 item &contained = src->contents.legacy_front();
-                contained.charges -= pt.base.fill_with( *contained.type, contained.charges );
+                contained.charges -= pt.base.fill_with( contained, contained.charges );
                 src->on_contents_changed();
 
                 if( pt.remaining_ammo_capacity() ) {
