@@ -770,10 +770,10 @@ bool game::start_game()
         start_loc.burn( omtstart, 3, 3 );
     }
     if( scen->has_flag( "INFECTED" ) ) {
-        u.add_effect( effect_infected, 1_turns, convert_bp( random_body_part() ).id(), true );
+        u.add_effect( effect_infected, 1_turns, get_player_character().random_body_part(), true );
     }
     if( scen->has_flag( "FUNGAL_INFECTION" ) ) {
-        u.add_effect( effect_fungus, 1_turns, convert_bp( random_body_part() ).id(), true );
+        u.add_effect( effect_fungus, 1_turns, get_player_character().random_body_part(), true );
     }
     if( scen->has_flag( "BAD_DAY" ) ) {
         u.add_effect( effect_flu, 1000_minutes );
@@ -1493,6 +1493,7 @@ bool game::do_turn()
                 }
                 sounds::process_sound_markers( &u );
                 if( !u.activity && !u.has_distant_destination() && uquit != QUIT_WATCH ) {
+                    wait_popup.reset();
                     ui_manager::redraw();
                 }
 
@@ -1628,14 +1629,15 @@ bool game::do_turn()
 
             // Avoid redrawing the main UI every time due to invalidation
             ui_adaptor dummy( ui_adaptor::disable_uis_below {} );
-            static_popup popup;
-            popup.on_top( true ).wait_message( "%s", wait_message );
+            wait_popup = std::make_unique<static_popup>();
+            wait_popup->on_top( true ).wait_message( "%s", wait_message );
             ui_manager::redraw();
             refresh_display();
             first_redraw_since_waiting_started = false;
         }
     } else {
         // Nothing to wait for now
+        wait_popup.reset();
         first_redraw_since_waiting_started = true;
     }
 
@@ -2521,7 +2523,7 @@ tripoint game::mouse_edge_scrolling_overmap( input_context &ctxt )
 
 input_context get_default_mode_input_context()
 {
-    input_context ctxt( "DEFAULTMODE", keyboard_mode::keychar );
+    input_context ctxt( "DEFAULTMODE", keyboard_mode::keycode );
     // Because those keys move the character, they don't pan, as their original name says
     ctxt.set_iso( true );
     ctxt.register_action( "UP", to_translation( "Move North" ) );

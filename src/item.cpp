@@ -2742,14 +2742,15 @@ void item::armor_info( std::vector<iteminfo> &info, const iteminfo_query *parts,
                 }
                 // Handle things that use both sides to avoid showing L. Arm R. Arm etc when both are the same
                 if( !t->sided ) {
-                    for( const body_part &legacy_part : all_body_parts ) {
-                        const bodypart_str_id &bp( convert_bp( legacy_part ) );
-                        bodypart_str_id opposite = bp->opposite_part;
-                        if( opposite != bp && covers( bp ) && covers( opposite )
-                            && to_display_data.at( bp ).portion == to_display_data.at( opposite ).portion
-                            && to_display_data.at( opposite ).active ) {
-                            to_display_data.at( opposite ).to_display = bp->name_as_heading_multiple;
-                            to_display_data.at( bp ).active = false;
+                    for( const armor_portion_data &piece : t->data ) {
+                        for( const bodypart_str_id &bp : *piece.covers ) {
+                            bodypart_str_id opposite = bp->opposite_part;
+                            if( opposite != bp && covers( bp ) && covers( opposite )
+                                && to_display_data.at( bp ).portion == to_display_data.at( opposite ).portion
+                                && to_display_data.at( opposite ).active ) {
+                                to_display_data.at( opposite ).to_display = bp->name_as_heading_multiple;
+                                to_display_data.at( bp ).active = false;
+                            }
                         }
                     }
                 }
@@ -5187,7 +5188,7 @@ int item::attack_time() const
 
 int item::damage_melee( damage_type dt ) const
 {
-    assert( dt >= DT_NULL && dt < NUM_DT );
+    assert( dt >= DT_NONE && dt < NUM_DT );
     if( is_null() ) {
         return 0;
     }
@@ -5234,7 +5235,7 @@ damage_instance item::base_damage_melee() const
 {
     // TODO: Caching
     damage_instance ret;
-    for( size_t i = DT_NULL + 1; i < NUM_DT; i++ ) {
+    for( size_t i = DT_NONE + 1; i < NUM_DT; i++ ) {
         damage_type dt = static_cast<damage_type>( i );
         int dam = damage_melee( dt );
         if( dam > 0 ) {
@@ -6240,7 +6241,7 @@ bool item::mod_damage( int qty, damage_type dt )
 
 bool item::mod_damage( const int qty )
 {
-    return mod_damage( qty, DT_NULL );
+    return mod_damage( qty, DT_NONE );
 }
 
 bool item::inc_damage( const damage_type dt )
@@ -6250,7 +6251,7 @@ bool item::inc_damage( const damage_type dt )
 
 bool item::inc_damage()
 {
-    return inc_damage( DT_NULL );
+    return inc_damage( DT_NONE );
 }
 
 nc_color item::damage_color() const
@@ -6364,7 +6365,7 @@ void item::mitigate_damage( damage_unit &du ) const
 int item::damage_resist( damage_type dt, bool to_self ) const
 {
     switch( dt ) {
-        case DT_NULL:
+        case DT_NONE:
         case NUM_DT:
             return 0;
         case DT_TRUE:
@@ -6703,7 +6704,7 @@ bool item::is_ammo_container() const
 
 bool item::is_melee() const
 {
-    for( int idx = DT_NULL + 1; idx != NUM_DT; ++idx ) {
+    for( int idx = DT_NONE + 1; idx != NUM_DT; ++idx ) {
         if( is_melee( static_cast<damage_type>( idx ) ) ) {
             return true;
         }
@@ -7215,7 +7216,7 @@ skill_id item::melee_skill() const
     int hi = 0;
     skill_id res = skill_id::NULL_ID();
 
-    for( int idx = DT_NULL + 1; idx != NUM_DT; ++idx ) {
+    for( int idx = DT_NONE + 1; idx != NUM_DT; ++idx ) {
         const int val = damage_melee( static_cast<damage_type>( idx ) );
         const skill_id &sk  = skill_by_dt( static_cast<damage_type>( idx ) );
         if( val > hi && sk ) {
@@ -9346,6 +9347,33 @@ void item::process_artifact( player *carrier, const tripoint & /*pos*/ )
     if( carrier && carrier->is_avatar() ) {
         g->process_artifact( *this, *carrier );
     }
+}
+
+std::vector<trait_id> item::mutations_from_wearing( const Character &guy ) const
+{
+    if( !is_relic() ) {
+        return std::vector<trait_id> {};
+    }
+    std::vector<trait_id> muts;
+
+    for( const enchantment &ench : relic_data->get_enchantments() ) {
+        for( const trait_id &mut : ench.get_mutations() ) {
+            // this may not be perfectly accurate due to conditions
+            muts.push_back( mut );
+        }
+    }
+
+    for( const trait_id &char_mut : guy.get_mutations() ) {
+        for( auto iter = muts.begin(); iter != muts.end(); ) {
+            if( char_mut == *iter ) {
+                iter = muts.erase( iter );
+            } else {
+                ++iter;
+            }
+        }
+    }
+
+    return muts;
 }
 
 void item::overwrite_relic( const relic &nrelic )
