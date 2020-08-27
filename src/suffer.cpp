@@ -79,7 +79,6 @@ static const bionic_id bio_trip( "bio_trip" );
 
 static const efftype_id effect_adrenaline( "adrenaline" );
 static const efftype_id effect_asthma( "asthma" );
-static const efftype_id effect_attention( "attention" );
 static const efftype_id effect_bleed( "bleed" );
 static const efftype_id effect_blind( "blind" );
 static const efftype_id effect_cig( "cig" );
@@ -1502,6 +1501,8 @@ void Character::suffer()
     suffer_without_sleep( sleep_deprivation );
     suffer_from_tourniquet();
     suffer_from_pain();
+    //Suffer from enchantments
+    enchantment_cache->activate_passive( *this );
 }
 
 bool Character::irradiate( float rads, bool bypass )

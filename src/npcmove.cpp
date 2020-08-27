@@ -1698,7 +1698,7 @@ bool npc::consume_cbm_items( const std::function<bool( const item & )> &filter )
     item_location loc = item_location( *this, filtered_items.front() );
     const time_duration &consume_time = get_consume_time( *loc );
     moves -= to_moves<int>( consume_time );
-    return consume( loc );
+    return consume( loc ) != trinary::NONE;
 }
 
 bool npc::recharge_cbm()
@@ -3851,7 +3851,7 @@ bool npc::consume_food_from_camp()
         yours->food_supply -= camp_kcals;
         return true;
     }
-    complain_about( "camp_larder_empty", 1_hours, "<camp_larder_empty", false );
+    complain_about( "camp_larder_empty", 1_hours, "<camp_larder_empty>", false );
     return false;
 }
 
@@ -3884,10 +3884,9 @@ bool npc::consume_food()
         }
 
         // consume doesn't return a meaningful answer, we need to compare moves
-        // TODO: Make player::consume return false if it fails to consume
         if( best_food != nullptr ) {
             const time_duration &consume_time = get_consume_time( *best_food );
-            consumed = consume( item_location( *this, best_food ) );
+            consumed = consume( item_location( *this, best_food ) ) != trinary::NONE;
             if( consumed ) {
                 moves -= to_moves<int>( consume_time );
             } else {
