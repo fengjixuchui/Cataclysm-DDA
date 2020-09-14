@@ -15,6 +15,7 @@
 #include "color.h"
 #include "debug.h"
 #include "enums.h"
+#include "event_bus.h"
 #include "flat_set.h"
 #include "game.h"
 #include "inventory.h"
@@ -1041,6 +1042,8 @@ static bool eat( item &food, player &you, bool force )
         }
     }
 
+    get_event_bus().send<event_type::character_eats_item>( you.getID(), food.typeId() );
+
     if( will_vomit ) {
         you.vomit();
     }
@@ -1738,7 +1741,7 @@ time_duration Character::get_consume_time( const item &it )
         } else {
             time = time_duration::from_seconds( 5 ); //probably pills so quick
         }
-    } else if( it.get_category().get_id() == item_category_chems ) {
+    } else if( it.get_category_shallow().get_id() == item_category_chems ) {
         time = time_duration::from_seconds( std::max( ( volume / 15 ),
                                             1 ) ); //Consume 15 mL (1 tablespoon) per second
         consume_time_modifier = mutation_value( "consume_time_modifier" );
@@ -1856,6 +1859,8 @@ trinary player::consume( item &target, bool force )
         feed_reactor_with( target ) ||
         feed_furnace_with( target ) ||
         fuel_bionic_with( target ) ) {
+
+        get_event_bus().send<event_type::character_consumes_item>( getID(), target.typeId() );
 
         target.on_contents_changed();
         return target.charges <= 0 ? trinary::ALL : trinary::SOME;
