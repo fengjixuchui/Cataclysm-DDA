@@ -22,6 +22,7 @@
 #include "debug.h"
 #include "filesystem.h"
 #include "game.h"
+#include "help.h"
 #include "loading_ui.h"
 #include "map.h"
 #include "messages.h"
@@ -120,6 +121,8 @@ static void init_global_game_state( const std::vector<mod_id> &mods,
     g = std::make_unique<game>( );
     g->new_game = true;
     g->load_static_data();
+
+    get_help().load();
 
     world_generator->set_active_world( nullptr );
     world_generator->init();
@@ -339,6 +342,11 @@ int main( int argc, const char *argv[] )
     std::chrono::duration<double> elapsed_seconds = end - start;
     DebugLog( D_INFO, DC_ALL ) << "Ended test at " << std::ctime( &end_time );
     DebugLog( D_INFO, DC_ALL ) << "The test took " << elapsed_seconds.count() << " seconds";
+
+    if( seed ) {
+        // Also print the seed at the end so it can be easily found
+        DebugLog( D_INFO, DC_ALL ) << "Randomness seeded to: " << seed;
+    }
 
     if( error_during_initialization ) {
         DebugLog( D_INFO, DC_ALL ) <<

@@ -83,7 +83,7 @@
       [ "rope_6", 20 ],
       [ "string_36", 25 ],
       [ "toilet_paper", 10 ],
-      [ "handflare", 15 ],
+      { "item": "handflare", "prob": 15, "charges": 300 },
       [ "duct_tape", 25 ],
       [ "flashlight", 25 ],
       [ "thread", 20 ],
@@ -838,7 +838,7 @@
       { "item": "marble", "prob": 15 },
       { "item": "creepy_doll", "prob": 1 },
       { "item": "jedi_cloak", "prob": 5 },
-      { "item": "glowstick", "prob": 15 },
+      { "item": "glowstick", "prob": 15, "charges": 1400 },
       { "item": "clown_suit", "prob": 5 },
       { "item": "clownshoes", "prob": 5 },
       { "item": "l-stick", "prob": 1 }
@@ -1741,7 +1741,7 @@
       [ "quikclot", 10 ],
       [ "hacksaw", 5 ],
       [ "gloves_rubber", 25 ],
-      [ "rag_bloody", 10 ],
+      { "item": "rag", "prob": 10, "custom-flags": [ "FILTHY" ] },
       [ "bag_plastic", 20 ],
       [ "string_6", 5 ]
     ]
@@ -1761,7 +1761,7 @@
       [ "soap", 10 ],
       [ "gloves_medical", 20 ],
       [ "rag", 15 ],
-      [ "rag_bloody", 2 ],
+      { "item": "rag", "prob": 2, "custom-flags": [ "FILTHY" ] },
       [ "bag_plastic", 20 ],
       [ "jerky", 40 ]
     ]

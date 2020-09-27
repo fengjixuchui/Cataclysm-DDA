@@ -453,10 +453,11 @@ void mutation_branch::load( const JsonObject &jo, const std::string & )
     optional( jo, was_loaded, "butchering_quality", butchering_quality, 0 );
 
     optional( jo, was_loaded, "allowed_category", allowed_category );
-
+    optional( jo, was_loaded, "crafting_speed_multiplier", crafting_speed_multiplier );
     optional( jo, was_loaded, "mana_modifier", mana_modifier, cata::nullopt );
     optional( jo, was_loaded, "mana_multiplier", mana_multiplier, cata::nullopt );
     optional( jo, was_loaded, "mana_regen_multiplier", mana_regen_multiplier, cata::nullopt );
+    optional( jo, was_loaded, "bionic_mana_penalty", bionic_mana_penalty, cata::nullopt );
 
     if( jo.has_object( "rand_cut_bonus" ) ) {
         JsonObject sm = jo.get_object( "rand_cut_bonus" );
@@ -540,6 +541,11 @@ void mutation_branch::load( const JsonObject &jo, const std::string & )
         encumbrance_covered[bp] = enc;
     }
 
+    for( JsonMember ema : jo.get_object( "encumbrance_multiplier_always" ) ) {
+        const bodypart_str_id &bp = bodypart_str_id( ema.name() );
+        encumbrance_multiplier_always[bp] = ema.get_float();
+    }
+
     for( const std::string line : jo.get_array( "restricts_gear" ) ) {
         restricts_gear.insert( bodypart_str_id( line ) );
     }
@@ -552,6 +558,10 @@ void mutation_branch::load( const JsonObject &jo, const std::string & )
         }
     }
 
+    for( JsonMember member : jo.get_object( "bionic_slot_bonuses" ) ) {
+        bionic_slot_bonuses[bodypart_str_id( member.name() )] = member.get_int();
+    }
+
     if( jo.has_array( "attacks" ) ) {
         for( JsonObject ao : jo.get_array( "attacks" ) ) {
             attacks_granted.emplace_back( load_mutation_attack( ao ) );
@@ -559,6 +569,16 @@ void mutation_branch::load( const JsonObject &jo, const std::string & )
     } else if( jo.has_object( "attacks" ) ) {
         JsonObject attack = jo.get_object( "attacks" );
         attacks_granted.emplace_back( load_mutation_attack( attack ) );
+    }
+}
+
+int mutation_branch::bionic_slot_bonus( const bodypart_str_id &part ) const
+{
+    const auto iter = bionic_slot_bonuses.find( part );
+    if( iter == bionic_slot_bonuses.end() ) {
+        return 0;
+    } else {
+        return iter->second;
     }
 }
 
@@ -633,7 +653,9 @@ void mutation_branch::check_consistency()
 
 nc_color mutation_branch::get_display_color() const
 {
-    if( threshold || profession ) {
+    if( flags.count( "ATTUNEMENT" ) ) {
+        return c_green;
+    } else if( threshold || profession ) {
         return c_white;
     } else if( debug ) {
         return c_light_cyan;

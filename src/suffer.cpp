@@ -119,7 +119,6 @@ static const trait_id trait_CHAOTIC( "CHAOTIC" );
 static const trait_id trait_CHAOTIC_BAD( "CHAOTIC_BAD" );
 static const trait_id trait_CHEMIMBALANCE( "CHEMIMBALANCE" );
 static const trait_id trait_DEBUG_NOTEMP( "DEBUG_NOTEMP" );
-static const trait_id trait_DEBUG_STORAGE( "DEBUG_STORAGE" );
 static const trait_id trait_FRESHWATEROSMOSIS( "FRESHWATEROSMOSIS" );
 static const trait_id trait_GILLS( "GILLS" );
 static const trait_id trait_GILLS_CEPH( "GILLS_CEPH" );
@@ -302,8 +301,7 @@ void Character::suffer_from_addictions()
 
 void Character::suffer_while_awake( const int current_stim )
 {
-    if( !has_trait( trait_DEBUG_STORAGE ) &&
-        ( weight_carried() > 4 * weight_capacity() ) ) {
+    if( weight_carried() > 4 * weight_capacity() ) {
         if( has_effect( effect_downed ) ) {
             add_effect( effect_downed, 1_turns, false, 0, true );
         } else {
@@ -1402,6 +1400,94 @@ void Character::suffer_from_stimulants( const int current_stim )
     }
 }
 
+static void apply_weary_message( const Character &you, int level, int old )
+{
+    if( level - old > 0 ) {
+        std::string msg;
+        switch( level ) {
+            case 1:
+                msg = _( "You're beginning to feel like you've exerted yourself a bit." );
+                break;
+            case 2:
+                msg = _( "You're tiring out mildly, and slowing down as a result" );
+                break;
+            case 3:
+                msg = _( "The day's labors are taking their toll, and slowing you down." );
+                break;
+            case 4:
+                msg = _( "You're getting very tired from all this hard work." );
+                break;
+            case 5:
+            default:
+                msg = _( "You're exhausted." );
+                break;
+        }
+        you.add_msg_if_player( m_info, msg );
+    } else {
+        you.add_msg_if_player( m_good, _( "You're feeling a bit better rested from your exertions." ) );
+    }
+}
+
+static void apply_weariness( Character &you, int level, int old )
+{
+    // Exertion cannot be negative!
+    if( level < 0 || old < 0 ) {
+        debugmsg( "Attempted to apply weariness to character with negative ( new: %d old: %d ) weariness",
+                  level, old );
+    }
+    // A mapping of weariness level to the effect to be applied
+    static const std::array<efftype_id, 9> weary_effects { {
+            efftype_id( "weary_0" ),
+            efftype_id( "weary_1" ),
+            efftype_id( "weary_2" ),
+            efftype_id( "weary_3" ),
+            efftype_id( "weary_4" ),
+            efftype_id( "weary_5" ),
+            efftype_id( "weary_6" ),
+            efftype_id( "weary_7" ),
+            efftype_id( "weary_8" ),
+        }};
+
+    // If we're going above level 8, we're seriously messed up
+    // So just stick to level 8
+    if( level > 8 ) {
+        level = 8;
+    }
+    if( old > 8 ) {
+        old = 8;
+    }
+
+    /*
+     * It's possible that old == level, but we need to make sure we're removing
+     * the old effect when that's not true It's simple enough to just remove
+     * the old effect then apply the new, effect, because no change will happen
+     * if they're equal
+     */
+    you.remove_effect( weary_effects[old] );
+    you.add_effect( weary_effects[level], 1_turns, true );
+    apply_weary_message( you, level, old );
+}
+
+void Character::suffer_from_exertion()
+{
+    int new_weary_level = weariness_level();
+    float max_activity = maximum_exertion_level();
+
+    // Only if there are changes (duh)
+    if( new_weary_level != old_weary_level ) {
+        apply_weariness( *this, new_weary_level, old_weary_level );
+    }
+
+    // Significantly slow the rate of messaging when in an activity
+    int chance = activity ? 2000 : 60;
+    if( attempted_activity_level > max_activity && one_in( chance ) && !in_sleep_state() ) {
+        add_msg( m_bad, _( "You're tiring out, continuing to work at this rate will be slower." ) );
+    }
+
+    // This must happen at the end, for hopefully obvious reasons
+    old_weary_level = new_weary_level;
+}
+
 void Character::suffer_without_sleep( const int sleep_deprivation )
 {
     // redo as a snippet?
@@ -1543,6 +1629,7 @@ void Character::suffer()
     }
 
     suffer_in_sunlight();
+    suffer_from_exertion();
     suffer_from_item_dropping();
     suffer_from_other_mutations();
     suffer_from_radiation();

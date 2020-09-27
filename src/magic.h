@@ -59,6 +59,7 @@ enum class spell_flag : int {
     RANDOM_DAMAGE, // picks random number between min+increment*level and max instead of normal behavior
     RANDOM_DURATION, // picks random number between min+increment*level and max instead of normal behavior
     RANDOM_TARGET, // picks a random valid target within your range instead of normal behavior.
+    RANDOM_CRITTER, // same as RANDOM_TARGET but ignores ground
     MUTATE_TRAIT, // overrides the mutate spell_effect to use a specific trait_id instead of a category
     WONDER, // instead of casting each of the extra_spells, it picks N of them and casts them (where N is std::min( damage(), number_of_spells ))
     PAIN_NORESIST, // pain altering spells can't be resisted (like with the deadened trait)
@@ -135,6 +136,16 @@ struct fake_spell {
                 const cata::optional<int> &max_level = cata::nullopt ) : id( sp_id ),
         max_level( max_level ), self( hit_self ) {}
 
+    bool operator==( const fake_spell &rhs ) const {
+        return id == rhs.id &&
+               max_level == rhs.max_level &&
+               level == rhs.level &&
+               self == rhs.self &&
+               trigger_once_in == rhs.trigger_once_in &&
+               trigger_message == rhs.trigger_message &&
+               npc_trigger_message == rhs.npc_trigger_message;
+    }
+
     // gets the spell with an additional override for minimum level (default 0)
     spell get_spell( int min_level_override = 0 ) const;
 
@@ -183,7 +194,7 @@ class spell_type
         std::vector<fake_spell> additional_spells;
 
         // if the spell has a field name defined, this is where it is
-        cata::optional<field_type_id> field;
+        cata::optional<field_type_id> field = cata::nullopt;
         // the chance one_in( field_chance ) that the field spawns at a tripoint in the area of the spell
         int field_chance = 0;
         // field intensity at spell level 0
@@ -293,6 +304,7 @@ class spell_type
 
         static void load_spell( const JsonObject &jo, const std::string &src );
         void load( const JsonObject &jo, const std::string & );
+        void serialize( JsonOut &json ) const;
         /**
          * All spells in the game.
          */
@@ -331,7 +343,7 @@ class spell_type
         static const float dot_increment_default;
         static const int max_dot_default;
         static const int min_duration_default;
-        static const float duration_increment_default;
+        static const int duration_increment_default;
         static const int max_duration_default;
         static const int min_pierce_default;
         static const float pierce_increment_default;
@@ -626,6 +638,8 @@ void morale( const spell &sp, Creature &caster, const tripoint &target );
 void charm_monster( const spell &sp, Creature &caster, const tripoint &target );
 void mutate( const spell &sp, Creature &caster, const tripoint &target );
 void bash( const spell &sp, Creature &caster, const tripoint &target );
+void dash( const spell &sp, Creature &caster, const tripoint &target );
+void banishment( const spell &sp, Creature &caster, const tripoint &target );
 void none( const spell &sp, Creature &, const tripoint &target );
 } // namespace spell_effect
 
