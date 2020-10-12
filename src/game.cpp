@@ -50,6 +50,7 @@
 #include "color.h"
 #include "computer_session.h"
 #include "construction.h"
+#include "construction_group.h"
 #include "coordinate_conversions.h"
 #include "coordinates.h"
 #include "creature_tracker.h"
@@ -204,7 +205,6 @@ static const skill_id skill_survival( "survival" );
 static const species_id species_PLANT( "PLANT" );
 
 static const efftype_id effect_adrenaline_mycus( "adrenaline_mycus" );
-static const efftype_id effect_assisted( "assisted" );
 static const efftype_id effect_blind( "blind" );
 static const efftype_id effect_bouldering( "bouldering" );
 static const efftype_id effect_contacts( "contacts" );
@@ -4285,7 +4285,7 @@ void game::mon_info_update( )
     for( auto &m : unique_mons ) {
         m.clear();
     }
-    std::fill( dangerous, dangerous + 8, false );
+    std::fill_n( dangerous, 8, false );
 
     const tripoint view = u.pos() + u.view_offset;
     new_seen_mon.clear();
@@ -5329,7 +5329,7 @@ bool game::revive_corpse( const tripoint &p, item &it )
 void game::save_cyborg( item *cyborg, const tripoint &couch_pos, player &installer )
 {
     int damage = cyborg->damage();
-    int dmg_lvl = cyborg->damage_level( 4 );
+    int dmg_lvl = cyborg->damage_level();
     int difficulty = 12;
 
     if( damage != 0 ) {
@@ -5577,14 +5577,14 @@ void game::control_vehicle()
         }
     }
     if( veh != nullptr && veh->player_in_control( u ) &&
-        veh->avail_part_with_feature( veh_part, "CONTROLS", true ) >= 0 ) {
+        veh->avail_part_with_feature( veh_part, "CONTROLS" ) >= 0 ) {
         veh->use_controls( u.pos() );
     } else if( veh && veh->player_in_control( u ) &&
-               veh->avail_part_with_feature( veh_part, "CONTROL_ANIMAL", true ) >= 0 ) {
+               veh->avail_part_with_feature( veh_part, "CONTROL_ANIMAL" ) >= 0 ) {
         u.controlling_vehicle = false;
         add_msg( m_info, _( "You let go of the reins." ) );
-    } else if( veh && ( veh->avail_part_with_feature( veh_part, "CONTROLS", true ) >= 0 ||
-                        ( veh->avail_part_with_feature( veh_part, "CONTROL_ANIMAL", true ) >= 0 &&
+    } else if( veh && ( veh->avail_part_with_feature( veh_part, "CONTROLS" ) >= 0 ||
+                        ( veh->avail_part_with_feature( veh_part, "CONTROL_ANIMAL" ) >= 0 &&
                           veh->has_engine_type( fuel_type_animal, false ) && veh->has_harnessed_animal() ) ) &&
                u.in_vehicle ) {
         if( !veh->interact_vehicle_locked() ) {
@@ -5893,16 +5893,13 @@ void game::examine( const tripoint &examp )
     }
 
     const optional_vpart_position vp = m.veh_at( examp );
-    if( vp && u.is_mounted() ) {
-        if( !u.mounted_creature->has_flag( MF_RIDEABLE_MECH ) ) {
-            add_msg( m_warning, _( "You cannot interact with a vehicle while mounted." ) );
-        } else {
-            vp->vehicle().interact_with( examp, vp->part_index() );
+    if( vp ) {
+        if( !u.is_mounted() || u.mounted_creature->has_flag( MF_RIDEABLE_MECH ) ) {
+            vp->vehicle().interact_with( *vp );
             return;
+        } else {
+            add_msg( m_warning, _( "You cannot interact with a vehicle while mounted." ) );
         }
-    } else if( vp && !u.is_mounted() ) {
-        vp->vehicle().interact_with( examp, vp->part_index() );
-        return;
     }
 
     if( m.has_flag( "CONSOLE", examp ) && !u.is_mounted() ) {
@@ -6331,7 +6328,7 @@ void game::print_trap_info( const tripoint &lp, const catacurses::window &w_look
         std::string tr_name;
         if( pc && tr == tr_unfinished_construction ) {
             const construction &built = pc->id.obj();
-            tr_name = string_format( _( "Unfinished task: %s, %d%% complete" ), built.description,
+            tr_name = string_format( _( "Unfinished task: %s, %d%% complete" ), built.group->name(),
                                      pc->counter / 100000 );
         } else {
             tr_name = tr.name();
@@ -7739,7 +7736,7 @@ game::vmenu_ret game::list_items( const std::vector<map_item_stack> &item_list )
             if( iItemNum > 0 && activeItem ) {
                 std::vector<iteminfo> vThisItem;
                 std::vector<iteminfo> vDummy;
-                activeItem->example->info( true, vThisItem );
+                activeItem->vIG[page_num].it->info( true, vThisItem );
 
                 item_info_data dummy( "", "", vThisItem, vDummy, iScrollPos );
                 dummy.without_getch = true;
@@ -7757,8 +7754,9 @@ game::vmenu_ret game::list_items( const std::vector<map_item_stack> &item_list )
         if( iItemNum > 0 && activeItem ) {
             // print info window title: < item name >
             mvwprintw( w_item_info, point( 2, 0 ), "< " );
-            trim_and_print( w_item_info, point( 4, 0 ), width - 8, activeItem->example->color_in_inventory(),
-                            activeItem->example->display_name() );
+            trim_and_print( w_item_info, point( 4, 0 ), width - 8,
+                            activeItem->vIG[page_num].it->color_in_inventory(),
+                            activeItem->vIG[page_num].it->display_name() );
             wprintw( w_item_info, " >" );
         }
 
@@ -7803,9 +7801,10 @@ game::vmenu_ret game::list_items( const std::vector<map_item_stack> &item_list )
         } else if( action == "EXAMINE" && !filtered_items.empty() && activeItem ) {
             std::vector<iteminfo> vThisItem;
             std::vector<iteminfo> vDummy;
-            activeItem->example->info( true, vThisItem );
+            activeItem->vIG[page_num].it->info( true, vThisItem );
 
-            item_info_data info_data( activeItem->example->tname(), activeItem->example->type_name(), vThisItem,
+            item_info_data info_data( activeItem->vIG[page_num].it->tname(),
+                                      activeItem->vIG[page_num].it->type_name(), vThisItem,
                                       vDummy );
             info_data.handle_scrolling = true;
 
@@ -8046,6 +8045,8 @@ game::vmenu_ret game::list_monsters( const std::vector<Creature *> &monster_list
     input_context ctxt( "LIST_MONSTERS" );
     ctxt.register_action( "UP", to_translation( "Move cursor up" ) );
     ctxt.register_action( "DOWN", to_translation( "Move cursor down" ) );
+    ctxt.register_action( "PAGE_UP" );
+    ctxt.register_action( "PAGE_DOWN" );
     ctxt.register_action( "NEXT_TAB" );
     ctxt.register_action( "PREV_TAB" );
     ctxt.register_action( "SAFEMODE_BLACKLIST_ADD" );
@@ -8257,6 +8258,20 @@ game::vmenu_ret game::list_monsters( const std::vector<Creature *> &monster_list
             if( iActive >= static_cast<int>( monster_list.size() ) ) {
                 iActive = 0;
             }
+        } else if( action == "PAGE_UP" ) {
+            iActive -= iMaxRows - 2;
+            if( iActive < 0 ) {
+                if( monster_list.empty() ) {
+                    iActive = 0;
+                } else {
+                    iActive = static_cast<int>( monster_list.size() ) - 1;
+                }
+            }
+        } else if( action == "PAGE_DOWN" ) {
+            iActive += iMaxRows - 2;
+            if( iActive >= static_cast<int>( monster_list.size() ) ) {
+                iActive = 0;
+            }
         } else if( action == "NEXT_TAB" || action == "PREV_TAB" ) {
             u.view_offset = stored_view_offset;
             return game::vmenu_ret::CHANGE_TAB;
@@ -8425,7 +8440,7 @@ static void add_disassemblables( uilist &menu,
                                              it.tname(), stack.second );
             menu.addentry_col( menu_index++, true, hotkey, msg,
                                to_string_clipped( recipe_dictionary::get_uncraft(
-                                       it.typeId() ).time_to_craft( get_player_character() ) ) );
+                                       it.typeId() ).time_to_craft( get_player_character(), recipe_time_flag::ignore_proficiencies ) ) );
             hotkey = cata::nullopt;
         }
     }
@@ -8737,7 +8752,7 @@ void game::butcher()
             int time_to_disassemble_recursive = 0;
             for( const auto &stack : disassembly_stacks ) {
                 const int time = recipe_dictionary::get_uncraft( stack.first->typeId() ).time_to_craft_moves(
-                                     get_player_character() );
+                                     get_player_character(), recipe_time_flag::ignore_proficiencies );
                 time_to_disassemble_once += time * stack.second;
                 time_to_disassemble_recursive += stack.first->get_recursive_disassemble_moves(
                                                      get_player_character() ) * stack.second;
@@ -9282,48 +9297,80 @@ bool game::prompt_dangerous_tile( const tripoint &dest_loc ) const
 
 std::vector<std::string> game::get_dangerous_tile( const tripoint &dest_loc ) const
 {
-    std::vector<std::string> harmful_stuff;
-    const field fields_here = m.field_at( u.pos() );
-    for( const auto &e : m.field_at( dest_loc ) ) {
-        // warn before moving into a dangerous field except when already standing within a similar field
-        if( u.is_dangerous_field( e.second ) && fields_here.find_field( e.first ) == nullptr ) {
-            harmful_stuff.push_back( e.second.name() );
-        }
+    if( u.is_blind() ) {
+        return {}; // blinded players don't see dangerous tiles
     }
 
-    if( !u.is_blind() ) {
-        const trap &tr = m.tr_at( dest_loc );
-        const bool boardable = static_cast<bool>( m.veh_at( dest_loc ).part_with_feature( "BOARDABLE",
-                               true ) );
-        // HACK: Hack for now, later ledge should stop being a trap
-        // Note: in non-z-level mode, ledges obey different rules and so should be handled as regular traps
-        if( tr == tr_ledge && m.has_zlevels() ) {
-            if( !boardable ) {
-                harmful_stuff.emplace_back( tr.name() );
+    std::vector<std::string> harmful_stuff;
+    const field fields_here = m.field_at( u.pos() );
+    const auto veh_here = m.veh_at( u.pos() ).part_with_feature( "BOARDABLE", true );
+    const auto veh_dest = m.veh_at( dest_loc ).part_with_feature( "BOARDABLE", true );
+    const bool exiting_vehicle = veh_here && !veh_dest;
+    const bool entering_veh = !veh_here && veh_dest;
+    const bool entering_veh_inside = entering_veh && veh_dest->is_inside();
+
+    for( const std::pair<const field_type_id, field_entry> &e : m.field_at( dest_loc ) ) {
+        if( !u.is_dangerous_field( e.second ) ) {
+            continue;
+        }
+
+        // if the field is dangerous but has no effects apparently this
+        // means effects are hardcoded in map_field.cpp so we should...
+        bool warn = e.second.field_effects().empty(); // ... warn if effects are empty
+        for( const field_effect &fe : e.second.field_effects() ) {
+            if( entering_veh && fe.immune_in_vehicle ) {
+                continue;
             }
-        } else if( tr.can_see( dest_loc, u ) && !tr.is_benign() && !boardable ) {
+            if( entering_veh_inside && fe.immune_inside_vehicle ) {
+                continue;
+            }
+            if( !entering_veh_inside && fe.immune_outside_vehicle ) {
+                continue;
+            }
+            warn = true;
+            break;
+        }
+
+        if( !warn ) {
+            continue;
+        }
+
+        // if not exiting a vehicle don't warn if already within similar field
+        if( !exiting_vehicle && fields_here.find_field( e.first ) != nullptr ) {
+            continue;
+        }
+
+        harmful_stuff.push_back( e.second.name() );
+    }
+
+    const trap &tr = m.tr_at( dest_loc );
+    // HACK: Hack for now, later ledge should stop being a trap
+    // Note: in non-z-level mode, ledges obey different rules and so should be handled as regular traps
+    if( tr == tr_ledge && m.has_zlevels() ) {
+        if( !veh_dest ) {
             harmful_stuff.emplace_back( tr.name() );
         }
+    } else if( tr.can_see( dest_loc, u ) && !tr.is_benign() && !veh_dest ) {
+        harmful_stuff.emplace_back( tr.name() );
+    }
 
-        static const std::set< bodypart_id > sharp_bps = {
-            bodypart_id( "eyes" ), bodypart_id( "mouth" ), bodypart_id( "head" ), bodypart_id( "leg_l" ), bodypart_id( "leg_r" ), bodypart_id( "foot_l" ), bodypart_id( "foot_r" ), bodypart_id( "arm_l" ), bodypart_id( "arm_r" ),
-            bodypart_id( "hand_l" ), bodypart_id( "hand_r" ), bodypart_id( "torso" )
-        };
+    static const std::set< bodypart_id > sharp_bps = {
+        bodypart_id( "eyes" ), bodypart_id( "mouth" ), bodypart_id( "head" ), bodypart_id( "leg_l" ), bodypart_id( "leg_r" ), bodypart_id( "foot_l" ), bodypart_id( "foot_r" ), bodypart_id( "arm_l" ), bodypart_id( "arm_r" ),
+        bodypart_id( "hand_l" ), bodypart_id( "hand_r" ), bodypart_id( "torso" )
+    };
 
-        const auto sharp_bp_check = [this]( bodypart_id bp ) {
-            return u.immune_to( bp, { damage_type::CUT, 10 } );
-        };
+    const auto sharp_bp_check = [this]( bodypart_id bp ) {
+        return u.immune_to( bp, { damage_type::CUT, 10 } );
+    };
 
-        if( m.has_flag( "ROUGH", dest_loc ) && !m.has_flag( "ROUGH", u.pos() ) && !boardable &&
-            ( u.get_armor_bash( bodypart_id( "foot_l" ) ) < 5 ||
-              u.get_armor_bash( bodypart_id( "foot_r" ) ) < 5 ) ) {
-            harmful_stuff.emplace_back( m.name( dest_loc ) );
-        } else if( m.has_flag( "SHARP", dest_loc ) && !m.has_flag( "SHARP", u.pos() ) && !( u.in_vehicle ||
-                   m.veh_at( dest_loc ) ) &&
-                   u.dex_cur < 78 && !std::all_of( sharp_bps.begin(), sharp_bps.end(), sharp_bp_check ) ) {
-            harmful_stuff.emplace_back( m.name( dest_loc ) );
-        }
-
+    if( m.has_flag( "ROUGH", dest_loc ) && !m.has_flag( "ROUGH", u.pos() ) && !veh_dest &&
+        ( u.get_armor_bash( bodypart_id( "foot_l" ) ) < 5 ||
+          u.get_armor_bash( bodypart_id( "foot_r" ) ) < 5 ) ) {
+        harmful_stuff.emplace_back( m.name( dest_loc ) );
+    } else if( m.has_flag( "SHARP", dest_loc ) && !m.has_flag( "SHARP", u.pos() ) && !( u.in_vehicle ||
+               m.veh_at( dest_loc ) ) &&
+               u.dex_cur < 78 && !std::all_of( sharp_bps.begin(), sharp_bps.end(), sharp_bp_check ) ) {
+        harmful_stuff.emplace_back( m.name( dest_loc ) );
     }
 
     return harmful_stuff;
@@ -10593,7 +10640,7 @@ void game::vertical_move( int movez, bool force, bool peeking )
             }
         }
 
-        if( !can_climb_here || pts.empty() ) {
+        if( pts.empty() ) {
             add_msg( m_info,
                      _( "You can't climb here - there is no terrain above you that would support your weight." ) );
             return;

@@ -78,6 +78,7 @@ enum vpart_bitflags : int {
     VPFLAG_REACTOR,
     VPFLAG_RAIL,
     VPFLAG_TURRET_CONTROLS,
+    VPFLAG_ROOF,
 
     NUM_VPFLAGS
 };
@@ -160,6 +161,10 @@ const std::vector<std::pair<std::string, translation>> vpart_variants = {
     { "vertical_2_left", to_translation( "vpart_variants", "Left Thick Vertical" ) },
     { "vertical_T_right", to_translation( "vpart_variants", "Right T Joint" ) },
     { "vertical_T_left", to_translation( "vpart_variants", "Left T Joint" ) },
+    { "front_right", to_translation( "vpart_variants", "Front Right" ) },
+    { "front_left", to_translation( "vpart_variants", "Front Left" ) },
+    { "rear_right", to_translation( "vpart_variants", "Rear Right" ) },
+    { "rear_left", to_translation( "vpart_variants", "Rear Left" ) },
     // these have to be last to avoid false positives
     { "vertical", to_translation( "vpart_variants", "Vertical" ) },
     { "horizontal", to_translation( "vpart_variants", "Horizontal" ) },
@@ -198,6 +203,7 @@ class vpart_info
         static void reset();
 
         static const std::map<vpart_id, vpart_info> &all();
+        static const std::set<std::string> &categories_all();
 
         /** Translated name of a part */
         std::string name() const;
@@ -216,6 +222,9 @@ class vpart_info
             return bitflags.test( flag );
         }
         void set_flag( const std::string &flag );
+
+        /** Gets whether part is in a category for display */
+        bool has_category( const std::string &category ) const;
 
         /** Format the description for display */
         int format_description( std::string &msg, const nc_color &format_color, int width ) const;
@@ -271,6 +280,8 @@ class vpart_info
 
     private:
         std::set<std::string> flags;
+        // category list for installation ui breakdown
+        std::set<std::string> categories;
         // flags checked so often that things slow down due to string cmp
         std::bitset<NUM_VPFLAGS> bitflags;
 

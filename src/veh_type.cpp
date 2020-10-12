@@ -104,6 +104,7 @@ static const std::unordered_map<std::string, vpart_bitflags> vpart_bitflag_map =
     { "REACTOR", VPFLAG_REACTOR },
     { "RAIL", VPFLAG_RAIL },
     { "TURRET_CONTROLS", VPFLAG_TURRET_CONTROLS },
+    { "ROOF", VPFLAG_ROOF },
 };
 
 static const std::vector<std::pair<std::string, veh_ter_mod>> standard_terrain_mod = {{
@@ -132,6 +133,7 @@ static const std::vector<std::pair<std::string, veh_ter_mod>> rail_terrain_mod =
 };
 
 static std::map<vpart_id, vpart_info> vpart_info_all;
+static std::set<std::string> vpart_categories_all;
 
 static std::map<vpart_id, vpart_info> abstract_parts;
 
@@ -348,11 +350,13 @@ void vpart_info::load( const JsonObject &jo, const std::string &src )
         if( base != vpart_info_all.end() ) {
             def = base->second;
             def.looks_like = base->second.id.str();
+            def.categories = base->second.categories;
         } else if( ab != abstract_parts.end() ) {
             def = ab->second;
             if( def.looks_like.empty() ) {
                 def.looks_like = ab->second.id.str();
             }
+            def.categories = ab->second.categories;
         } else {
             deferred.emplace_back( jo.str(), src );
             return;
@@ -391,6 +395,7 @@ void vpart_info::load( const JsonObject &jo, const std::string &src )
     assign( jo, "difficulty", def.difficulty );
     assign( jo, "bonus", def.bonus );
     assign( jo, "cargo_weight_modifier", def.cargo_weight_modifier );
+    assign( jo, "categories", def.categories );
     assign( jo, "flags", def.flags );
     assign( jo, "description", def.description );
 
@@ -436,7 +441,6 @@ void vpart_info::load( const JsonObject &jo, const std::string &src )
         } else {
             def.symbols[ variant_id ] = symbol;
         }
-        def.sym = jo.get_string( "symbol" )[ 0 ];
     }
     if( jo.has_bool( "standard_symbols" ) && jo.get_bool( "standard_symbols" ) ) {
         // Fallback symbol for unknown variant
@@ -503,6 +507,10 @@ void vpart_info::load( const JsonObject &jo, const std::string &src )
         abstract_parts[def.id] = def;
     } else {
         vpart_info_all[def.id] = def;
+    }
+
+    for( const std::string &cat : def.categories ) {
+        vpart_categories_all.insert( cat );
     }
 }
 
@@ -768,12 +776,18 @@ void vpart_info::check()
 void vpart_info::reset()
 {
     vpart_info_all.clear();
+    vpart_categories_all.clear();
     abstract_parts.clear();
 }
 
 const std::map<vpart_id, vpart_info> &vpart_info::all()
 {
     return vpart_info_all;
+}
+
+const std::set<std::string> &vpart_info::categories_all()
+{
+    return vpart_categories_all;
 }
 
 std::string vpart_info::name() const
@@ -793,31 +807,35 @@ int vpart_info::format_description( std::string &msg, const nc_color &format_col
     msg += "> <color_" + string_from_color( format_color ) + ">";
 
     std::string long_descrip;
-    if( !description.empty() ) {
-        long_descrip += description.translated();
-    }
-    for( const auto &flagid : flags ) {
-        if( flagid == "ALARMCLOCK"
-            || flagid == "WATCH"
-            || flagid == "ENABLED_DRAINS_EPOWER"
-            || flagid == "SOLAR_PANEL" ) {
+    // handle appending text and double-whitespace
+    const auto append_desc = [&long_descrip]( const std::string & text ) {
+        if( text.empty() ) {
+            return;
+        }
+        if( !long_descrip.empty() ) {
+            long_descrip += "  ";
+        }
+        long_descrip += text;
+    };
+
+    append_desc( description.translated() );
+
+    for( const std::string &flagid : flags ) {
+        if( flagid == "ALARMCLOCK" || flagid == "WATCH" ) {
             continue;
-        }
-        json_flag flag = json_flag::get( flagid );
-        if( !flag.info().empty() ) {
-            if( !long_descrip.empty() ) {
-                long_descrip += "  ";
+        } else if( flagid == "ENABLED_DRAINS_EPOWER" ||
+                   flagid == "ENGINE" ) { // ENGINEs get the same description
+            if( epower < 0 ) {
+                append_desc( string_format( json_flag::get( "ENABLED_DRAINS_EPOWER" ).info(), -epower ) );
             }
-            long_descrip += flag.info();
+        } else if( flagid == "ALTERNATOR" ||
+                   flagid == "SOLAR_PANEL" ||
+                   flagid == "WATER_WHEEL" ||
+                   flagid == "WIND_TURBINE" ) {
+            append_desc( string_format( json_flag::get( flagid ).info(), epower ) );
+        } else {
+            append_desc( json_flag::get( flagid ).info() );
         }
-    }
-    if( ( has_flag( "SEAT" ) || has_flag( "BED" ) ) && !has_flag( "BELTABLE" ) ) {
-        json_flag nobelt = json_flag::get( "NONBELTABLE" );
-        long_descrip += "  " + nobelt.info();
-    }
-    if( has_flag( "BOARDABLE" ) && has_flag( "OPENABLE" ) ) {
-        json_flag door = json_flag::get( "DOOR" );
-        long_descrip += "  " + door.info();
     }
     if( has_flag( "TURRET" ) ) {
         class::item base( item );
@@ -834,14 +852,6 @@ int vpart_info::format_description( std::string &msg, const nc_color &format_col
         long_descrip += string_format( _( "\nRange: %1$5d     Damage: %2$5.0f" ),
                                        base.gun_range( true ),
                                        base.gun_damage().total_damage() );
-    }
-    if( has_flag( "ENABLED_DRAINS_EPOWER" ) ) {
-        json_flag drains = json_flag::get( "ENABLED_DRAINS_EPOWER" );
-        long_descrip += "  " + string_format( drains.info(), std::to_string( -epower ) );
-    }
-    if( has_flag( "SOLAR_PANEL" ) ) {
-        json_flag solar_panel = json_flag::get( "SOLAR_PANEL" );
-        long_descrip += "  " + string_format( solar_panel.info(), std::to_string( epower ) );
     }
 
     if( !long_descrip.empty() ) {
@@ -969,6 +979,11 @@ std::vector<itype_id> vpart_info::engine_fuel_opts() const
     return has_flag( VPFLAG_ENGINE ) ? engine_info->fuel_opts : std::vector<itype_id>();
 }
 
+bool vpart_info::has_category( const std::string &category ) const
+{
+    return this->categories.find( category ) != this->categories.end();
+}
+
 /**
  * @name Wheel specific functions
  *
@@ -1076,6 +1091,11 @@ void vehicle_prototype::load( const JsonObject &jo )
 
         vproto.parts.push_back( pt );
     };
+
+    if( jo.has_member( "blueprint" ) ) {
+        // currently unused, read to suppress unvisited members warning
+        jo.get_array( "blueprint" );
+    }
 
     for( JsonObject part : jo.get_array( "parts" ) ) {
         point pos = point( part.get_int( "x" ), part.get_int( "y" ) );

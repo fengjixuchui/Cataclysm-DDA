@@ -184,6 +184,10 @@ std::vector<const recipe *> recipe_subset::search( const std::string &txt,
                 return lcmatch( remove_color_tags( result.info( true ) ), txt );
             }
 
+            case search_type::proficiency:
+                return lcmatch( r->required_proficiencies_string( nullptr ), txt ) ||
+                       lcmatch( r->used_proficiencies_string( nullptr ), txt );
+
             default:
                 return false;
         }
@@ -373,7 +377,7 @@ void recipe_dictionary::find_items_on_loops()
     items_on_loops.clear();
     std::unordered_map<itype_id, std::vector<itype_id>> potential_components_of;
     for( const itype *i : item_controller->all() ) {
-        if( !i->comestible || i->item_tags.count( "NUTRIENT_OVERRIDE" ) ) {
+        if( !i->comestible || i->has_flag( "NUTRIENT_OVERRIDE" ) ) {
             continue;
         }
         std::vector<itype_id> &potential_components = potential_components_of[i->get_id()];
