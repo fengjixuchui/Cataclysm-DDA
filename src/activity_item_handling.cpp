@@ -2142,8 +2142,8 @@ static bool mine_activity( player &p, const tripoint &src_loc )
         // We're breaking up some flat surface like pavement, which is much easier
         moves /= 2;
     }
-    p.assign_activity( powered ? ACT_JACKHAMMER : ACT_PICKAXE, moves, -1,
-                       p.get_item_position( chosen_item ) );
+    p.assign_activity( powered ? ACT_JACKHAMMER : ACT_PICKAXE, moves );
+    p.activity.targets.push_back( item_location( p, chosen_item ) );
     p.activity.placement = here.getabs( src_loc );
     return true;
 
@@ -2874,7 +2874,7 @@ int get_auto_consume_moves( player &p, const bool food )
                 // not good eatings.
                 continue;
             }
-            if( !p.can_consume( it ) ) {
+            if( !p.can_consume( comest ) ) {
                 continue;
             }
             if( food && p.compute_effective_nutrients( comest ).kcal < 50 ) {
